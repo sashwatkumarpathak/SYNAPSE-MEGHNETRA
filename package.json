@@ -1,0 +1,12 @@
+{
+  "name": "synapse-meghnetra",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/web", "services/api-node"],
+  "scripts": {
+    "dev": "npm --workspace apps/web run dev",
+    "build": "npm --workspace apps/web run build",
+    "start": "npm --workspace apps/web run start",
+    "lint": "npm --workspace apps/web run lint"
+  }
+}
