@@ -57,15 +57,15 @@ type FieldPoint = {
 };
 
 function gridSpacing(zoom: number) {
-  if (zoom < 5.5) return 1.45;
-  if (zoom < 6.5) return 0.95;
-  if (zoom < 7.5) return 0.68;
-  if (zoom < 8.5) return 0.48;
-  if (zoom < 9.5) return 0.32;
-  if (zoom < 10.5) return 0.22;
-  if (zoom < 11.5) return 0.15;
-  if (zoom < 12.5) return 0.105;
-  return 0.075;
+  if (zoom < 5.5) return 0.85;
+  if (zoom < 6.5) return 0.62;
+  if (zoom < 7.5) return 0.46;
+  if (zoom < 8.5) return 0.34;
+  if (zoom < 9.5) return 0.25;
+  if (zoom < 10.5) return 0.18;
+  if (zoom < 11.5) return 0.13;
+  if (zoom < 12.5) return 0.095;
+  return 0.07;
 }
 
 function clampBounds(bounds?: mapboxgl.LngLatBounds) {
@@ -154,13 +154,13 @@ function windVector(lng: number, lat: number, events: WeatherEvent[]) {
 }
 
 function particleCount(zoom: number) {
-  if (zoom < 5.5) return 90;
-  if (zoom < 7) return 150;
-  if (zoom < 8.5) return 240;
-  if (zoom < 10) return 360;
-  if (zoom < 11.5) return 520;
-  if (zoom < 13) return 760;
-  return 980;
+  if (zoom < 5.5) return 55;
+  if (zoom < 7) return 80;
+  if (zoom < 8.5) return 110;
+  if (zoom < 10) return 145;
+  if (zoom < 11.5) return 190;
+  if (zoom < 13) return 250;
+  return 320;
 }
 
 export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect }: Props) {
@@ -255,8 +255,8 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
         paint: {
           'heatmap-weight': ['interpolate', ['linear'], ['get', 'rain'], 0, 0, 10, 1],
           'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3, 0.68, 7, 0.92, 11, 1.1, 15, 1.25],
-          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3, 28, 7, 22, 10, 15, 13, 9, 15, 7],
-          'heatmap-opacity': 0.54,
+          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3, 46, 6, 42, 8, 38, 10, 34, 12, 30, 15, 26],
+          'heatmap-opacity': 0.58,
           'heatmap-color': [
             'interpolate',
             ['linear'],
@@ -490,9 +490,9 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
 
         particles.forEach((particle, index) => {
           const vector = windVector(particle.lng, particle.lat, eventsRef.current);
-          const zoomFactor = Math.max(0.018, Math.min(0.075, vector.speed / 520));
-          particle.lng += vector.u * zoomFactor * dt * 60;
-          particle.lat += vector.v * zoomFactor * dt * 60;
+          const motion = Math.max(0.000025, Math.min(0.000095, vector.speed / 420000));
+          particle.lng += vector.u * motion * dt * 60;
+          particle.lat += vector.v * motion * dt * 60;
           particle.age += dt / particle.life;
 
           if (
@@ -506,39 +506,28 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
             return;
           }
 
-          const tailScale = Math.max(0.035, Math.min(0.16, vector.speed / 260));
-          const tailLng = particle.lng - vector.u * tailScale;
-          const tailLat = particle.lat - vector.v * tailScale;
+          const trailScale = Math.max(0.006, Math.min(0.018, vector.speed / 2600));
+          const tailLng = particle.lng - vector.u * trailScale;
+          const tailLat = particle.lat - vector.v * trailScale;
 
           const a = instance.project([tailLng, tailLat]);
           const b = instance.project([particle.lng, particle.lat]);
 
           const lifeFade = Math.sin(Math.min(1, particle.age) * Math.PI);
-          const alpha = (0.18 + Math.min(0.58, vector.speed / 38)) * lifeFade;
+          const alpha = (0.10 + Math.min(0.22, vector.speed / 150)) * lifeFade;
 
-          ctx.strokeStyle = `rgba(115, 231, 255, ${alpha})`;
-          ctx.lineWidth = instance.getZoom() > 10 ? 1.15 : 0.85;
+          const gradient = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+          gradient.addColorStop(0, 'rgba(115, 231, 255, 0)');
+          gradient.addColorStop(0.45, `rgba(115, 231, 255, ${alpha * 0.55})`);
+          gradient.addColorStop(1, `rgba(180, 244, 255, ${alpha})`);
+
+          ctx.strokeStyle = gradient;
+          ctx.lineWidth = instance.getZoom() > 11 ? 1 : 0.7;
+          ctx.lineCap = 'round';
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           ctx.lineTo(b.x, b.y);
           ctx.stroke();
-
-          const angle = Math.atan2(b.y - a.y, b.x - a.x);
-          const head = instance.getZoom() > 11 ? 3.5 : 2.8;
-
-          ctx.fillStyle = `rgba(174, 244, 255, ${Math.min(0.82, alpha + 0.12)})`;
-          ctx.beginPath();
-          ctx.moveTo(b.x, b.y);
-          ctx.lineTo(
-            b.x - Math.cos(angle - 0.48) * head,
-            b.y - Math.sin(angle - 0.48) * head,
-          );
-          ctx.lineTo(
-            b.x - Math.cos(angle + 0.48) * head,
-            b.y - Math.sin(angle + 0.48) * head,
-          );
-          ctx.closePath();
-          ctx.fill();
         });
       }
 
