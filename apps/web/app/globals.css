@@ -1298,3 +1298,76 @@ button {
     .layer-control { width: 148px; top: 46px }
     .layer-readout { bottom: 55px; right: 10px }
 }
+
+/* Real map engine surface */
+.interactive-map {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: inherit;
+    background: #020b13
+}
+.mapbox-canvas {
+    position: absolute;
+    inset: 0
+}
+.interactive-map .mapboxgl-map {
+    font-family: Inter, Arial, sans-serif
+}
+.interactive-map .mapboxgl-ctrl-group {
+    background: rgba(2,12,21,.78);
+    border: 1px solid rgba(112,178,218,.16);
+    box-shadow: 0 8px 25px rgba(0,0,0,.3)
+}
+.interactive-map .mapboxgl-ctrl button {
+    filter: invert(1) brightness(1.7);
+    opacity: .75
+}
+.map-engine-notice {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%,-50%);
+    width: min(360px, calc(100% - 36px));
+    padding: 16px;
+    border: 1px solid rgba(36,200,255,.2);
+    border-radius: 13px;
+    background: rgba(2,12,21,.88);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 0 40px rgba(0,140,255,.08);
+    text-align: center;
+    z-index: 5
+}
+.map-engine-notice strong {
+    display: block;
+    color: #7fe1ff;
+    font-size: 10px;
+    letter-spacing: .13em
+}
+.map-engine-notice span {
+    display: block;
+    color: #5c7b91;
+    font-size: 9px;
+    line-height: 1.5;
+    margin-top: 6px
+}
+.map-layer-badge {
+    position: absolute;
+    top: 48px;
+    left: 17px;
+    z-index: 5;
+    border: 1px solid rgba(112,178,218,.16);
+    border-radius: 9px;
+    padding: 7px 9px;
+    background: rgba(2,12,21,.76);
+    color: #53758c;
+    font-size: 7px;
+    letter-spacing: .1em;
+    backdrop-filter: blur(10px)
+}
+.map-layer-badge b {
+    color: #74d8fa
+}
+.interactive-map .mapboxgl-canvas {
+    outline: none
+}
