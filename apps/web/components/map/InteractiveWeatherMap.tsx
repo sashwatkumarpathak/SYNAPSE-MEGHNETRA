@@ -194,7 +194,19 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
     if (instance.getLayer('3d-buildings')) {
       instance.setLayoutProperty('3d-buildings', 'visibility', mode === '3D' ? 'visible' : 'none');
     }
-  }, [selected, mode]);
+    markerRefs.current.forEach(marker => marker.remove());
+    markerRefs.current = [];
+    const marker = document.createElement('button');
+    marker.type = 'button';
+    marker.className = 'meghnetra-selected-marker';
+    marker.setAttribute('aria-label', `Selected event: ${selected.city}`);
+    marker.innerHTML = '<span class="marker-ring"></span><span class="marker-ring ring-2"></span><span class="marker-core"></span><span class="marker-label"></span>';
+    const label = marker.querySelector('.marker-label');
+    if (label) label.textContent = `${selected.type} · ${selected.confidence}%`;
+    marker.addEventListener('click', () => onSelect(selected));
+    const selectedMarker = new mapboxgl.Marker({element: marker, anchor: 'center'}).setLngLat(target).addTo(instance);
+    markerRefs.current.push(selectedMarker);
+  }, [selected, mode, onSelect]);
 
 
   useEffect(() => {
