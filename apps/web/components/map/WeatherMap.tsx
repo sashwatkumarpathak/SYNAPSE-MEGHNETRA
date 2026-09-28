@@ -14,7 +14,7 @@ export function WeatherMap({selected,setSelected}:{selected:WeatherEvent,setSele
   const [layer,setLayer]=useState<WeatherLayer>('rainfall');
   const [mode,setMode]=useState<'2D'|'3D'>('2D');
   if (process.env.NEXT_PUBLIC_MAPBOX_TOKEN) {
-    return <div className="map-shell"><InteractiveWeatherMap events={events} selected={selected} mode={mode} layer={layer} onSelect={setSelected}/></div>;
+    return <div className="map-shell"><InteractiveWeatherMap events={events} selected={selected} mode={mode} layer={layer} onSelect={setSelected}/><LayerControl value={layer} onChange={setLayer}/><ViewModeToggle mode={mode} onChange={setMode}/><div className="map-legend"><span><i className="rain"/>Intensity</span><span><i className="warn"/>Alert</span><span><i className="verified"/>Verified</span></div></div>;
   }
 
   return <div className="map-shell">
