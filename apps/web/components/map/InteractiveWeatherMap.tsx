@@ -50,6 +50,9 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
     instance.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'bottom-right');
 
     instance.on('load', () => {
+      instance.addSource('meghnetra-terrain', { type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14 });
+      instance.setTerrain({ source: 'meghnetra-terrain', exaggeration: 1.12 });
+
       if (!instance.getSource('meghnetra-events')) {
         instance.addSource('meghnetra-events', {
           type: 'geojson',
@@ -63,8 +66,28 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
                 severity: event.severity,
                 confidence: event.confidence,
                 city: event.city,
+                rain: event.rain,
+                temp: event.temp,
+                humidity: event.humidity,
+                wind: Math.max(1, event.rain * 1.8),
+                cloud: Math.min(100, event.humidity + 8),
+                visibility: Math.max(1, 12 - event.rain * 0.8),
               },
             })),
+          },
+        });
+
+        instance.addLayer({
+          id: 'meghnetra-weather-field',
+          type: 'heatmap',
+          source: 'meghnetra-events',
+          maxzoom: 9,
+          paint: {
+            'heatmap-weight': ['interpolate', ['linear'], ['get', 'rain'], 0, 0, 8, 1],
+            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3, 0.65, 9, 1.5],
+            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3, 22, 9, 46],
+            'heatmap-opacity': 0.58,
+            'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(0,80,255,0)', 0.25, '#00b7ff', 0.5, '#1ee5b5', 0.72, '#ffe44d', 0.9, '#ff8a32', 1, '#ff3b61'],
           },
         });
 
@@ -172,6 +195,40 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       instance.setLayoutProperty('3d-buildings', 'visibility', mode === '3D' ? 'visible' : 'none');
     }
   }, [selected, mode]);
+
+
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance) return;
+    const source = instance.getSource('meghnetra-events') as mapboxgl.GeoJSONSource | undefined;
+    if (!source) return;
+    const max = layer === 'rainfall' ? 8 : layer === 'temperature' ? 40 : layer === 'humidity' ? 100 : layer === 'visibility' ? 12 : 100;
+    const features = events.map(event => ({
+      type: 'Feature' as const,
+      geometry: { type: 'Point' as const, coordinates: coords[event.city] ?? [78.9629, 20.5937] },
+      properties: {
+        id: event.id, severity: event.severity, confidence: event.confidence, city: event.city,
+        rain: event.rain, temp: event.temp, humidity: event.humidity,
+        wind: Math.max(1, event.rain * 1.8), cloud: Math.min(100, event.humidity + 8),
+        visibility: Math.max(1, 12 - event.rain * 0.8),
+      },
+    }));
+    source.setData({ type: 'FeatureCollection', features });
+    if (instance.getLayer('meghnetra-weather-field')) {
+      const field = layer === 'temperature' ? 'temp' : layer === 'humidity' ? 'humidity' : layer === 'visibility' ? 'visibility' : layer === 'wind' ? 'wind' : layer === 'cloud' ? 'cloud' : 'rain';
+      const min = field === 'visibility' ? 1 : 0;
+      instance.setPaintProperty('meghnetra-weather-field', 'heatmap-weight', ['interpolate', ['linear'], ['get', field], min, 0, max, 1]);
+    }
+  }, [layer, events]);
+
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance) return;
+    if (instance.getLayer('3d-buildings')) {
+      instance.setLayoutProperty('3d-buildings', 'visibility', mode === '3D' ? 'visible' : 'none');
+    }
+    if (mode === '3D') instance.setTerrain({ source: 'meghnetra-terrain', exaggeration: 1.12 });
+  }, [mode]);
 
   return <div className="interactive-map">
     <div ref={container} className="mapbox-canvas" />
