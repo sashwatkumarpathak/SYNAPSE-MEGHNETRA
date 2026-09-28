@@ -56,10 +56,36 @@ type FieldPoint = {
   };
 };
 
-function buildWeatherField(events: WeatherEvent[]): FieldPoint[] {
+function gridSpacing(zoom: number) {
+  if (zoom < 5.5) return 1.45;
+  if (zoom < 6.5) return 0.95;
+  if (zoom < 7.5) return 0.68;
+  if (zoom < 8.5) return 0.48;
+  if (zoom < 9.5) return 0.32;
+  if (zoom < 10.5) return 0.22;
+  if (zoom < 11.5) return 0.15;
+  if (zoom < 12.5) return 0.105;
+  return 0.075;
+}
+
+function clampBounds(bounds?: mapboxgl.LngLatBoundsLike) {
+  if (!bounds) return { west: 68, south: 8, east: 97, north: 35 };
+  const b = new mapboxgl.LngLatBounds(bounds);
+  return {
+    west: Math.max(67, b.getWest() - 0.5),
+    south: Math.max(6, b.getSouth() - 0.5),
+    east: Math.min(99, b.getEast() + 0.5),
+    north: Math.min(37, b.getNorth() + 0.5),
+  };
+}
+
+function buildWeatherField(events: WeatherEvent[], zoom = 4.25, bounds?: mapboxgl.LngLatBoundsLike): FieldPoint[] {
+  const { west, south, east, north } = clampBounds(bounds);
+  const spacing = gridSpacing(zoom);
   const points: FieldPoint[] = [];
-  for (let lat = 8; lat <= 35; lat += 1.35) {
-    for (let lng = 68; lng <= 97; lng += 1.35) {
+
+  for (let lat = south; lat <= north; lat += spacing) {
+    for (let lng = west; lng <= east; lng += spacing) {
       let rain = 0.55 + 1.2 * Math.max(0, Math.sin((lng - 68) / 4.2));
       let temp = 32 - (lat - 8) * 0.38;
       let humidity = 57 + 18 * Math.sin((lng + lat) / 8);
@@ -75,7 +101,9 @@ function buildWeatherField(events: WeatherEvent[]): FieldPoint[] {
         temp += (event.temp - 30) * influence * 0.7;
         humidity += (event.humidity - 65) * influence * 0.55;
         wind += (windByCity[event.city]?.speed ?? 12) * influence * 0.16;
-        direction = (direction + (windByCity[event.city]?.direction ?? 90) * influence * 0.5) / (1 + influence * 0.5);
+        direction =
+          (direction + (windByCity[event.city]?.direction ?? 90) * influence * 0.5) /
+          (1 + influence * 0.5);
       });
 
       points.push({
@@ -93,29 +121,46 @@ function buildWeatherField(events: WeatherEvent[]): FieldPoint[] {
       });
     }
   }
-  return points;
-}
 
-function buildWindVectors(events: WeatherEvent[]) {
-  const vectors = buildWeatherField(events).filter((_, index) => index % 3 === 0).map(point => {
-    const [lng, lat] = point.geometry.coordinates;
-    const direction = point.properties.direction * Math.PI / 180;
-    const length = 0.34;
-    const end: [number, number] = [
-      lng + Math.sin(direction) * length,
-      lat + Math.cos(direction) * length,
-    ];
-    return {
-      type: 'Feature' as const,
-      geometry: { type: 'LineString' as const, coordinates: [[lng, lat], end] },
-      properties: { direction: point.properties.direction, speed: point.properties.wind },
-    };
-  });
-  return { type: 'FeatureCollection' as const, features: vectors };
+  return points;
 }
 
 function windFor(event: WeatherEvent) {
   return windByCity[event.city] ?? { speed: 12, gust: 18, direction: 90, cardinal: 'E' };
+}
+
+function windVector(lng: number, lat: number, events: WeatherEvent[]) {
+  let speed = 10 + 4 * Math.sin((lng - 70) / 4) + 2.5 * Math.cos(lat / 5);
+  let direction = 55 + 34 * Math.sin((lng + lat) / 9);
+
+  events.forEach(event => {
+    const [eLng, eLat] = coords[event.city] ?? [78.9629, 20.5937];
+    const dx = (lng - eLng) * Math.cos((lat * Math.PI) / 180);
+    const dy = lat - eLat;
+    const influence = Math.exp(-(dx * dx + dy * dy) / 45);
+    speed += (windByCity[event.city]?.speed ?? 12) * influence * 0.16;
+    direction =
+      (direction + (windByCity[event.city]?.direction ?? 90) * influence * 0.5) /
+      (1 + influence * 0.5);
+  });
+
+  const radians = ((direction + 360) % 360) * Math.PI / 180;
+  return {
+    speed: Math.max(2, Math.min(40, speed)),
+    direction: (direction + 360) % 360,
+    u: Math.sin(radians),
+    v: Math.cos(radians),
+  };
+}
+
+function particleCount(zoom: number) {
+  if (zoom < 5.5) return 90;
+  if (zoom < 7) return 150;
+  if (zoom < 8.5) return 240;
+  if (zoom < 10) return 360;
+  if (zoom < 11.5) return 520;
+  if (zoom < 13) return 760;
+  return 980;
 }
 
 export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect }: Props) {
@@ -123,8 +168,10 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
   const map = useRef<mapboxgl.Map | null>(null);
   const markerRefs = useRef<mapboxgl.Marker[]>([]);
   const windCanvas = useRef<HTMLCanvasElement | null>(null);
-  const weatherField = useMemo(() => buildWeatherField(events), [events]);
-  const windVectors = useMemo(() => buildWindVectors(events), [events]);
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
+
+  const initialField = useMemo(() => buildWeatherField(events), [events]);
   const selectedWind = windFor(selected);
 
   useEffect(() => {
@@ -154,7 +201,10 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       attributionControl: { compact: true },
     });
 
-    instance.addControl(new mapboxgl.NavigationControl({ showCompass: true, visualizePitch: true }), 'bottom-right');
+    instance.addControl(
+      new mapboxgl.NavigationControl({ showCompass: true, visualizePitch: true }),
+      'bottom-right',
+    );
 
     instance.on('load', () => {
       instance.addSource('meghnetra-terrain', {
@@ -167,12 +217,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
 
       instance.addSource('meghnetra-field', {
         type: 'geojson',
-        data: { type: 'FeatureCollection', features: weatherField },
-      });
-
-      instance.addSource('meghnetra-wind-vectors', {
-        type: 'geojson',
-        data: windVectors,
+        data: { type: 'FeatureCollection', features: initialField },
       });
 
       instance.addSource('meghnetra-events', {
@@ -181,7 +226,10 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
           type: 'FeatureCollection',
           features: events.map(event => ({
             type: 'Feature' as const,
-            geometry: { type: 'Point' as const, coordinates: coords[event.city] ?? [78.9629, 20.5937] },
+            geometry: {
+              type: 'Point' as const,
+              coordinates: coords[event.city] ?? [78.9629, 20.5937],
+            },
             properties: {
               id: event.id,
               severity: event.severity,
@@ -203,14 +251,16 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
         type: 'heatmap',
         source: 'meghnetra-field',
         slot: 'bottom',
-        maxzoom: 9,
+        maxzoom: 15,
         paint: {
           'heatmap-weight': ['interpolate', ['linear'], ['get', 'rain'], 0, 0, 10, 1],
-          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3, 0.72, 7, 1.18, 9, 1.55],
-          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3, 22, 7, 34, 9, 48],
-          'heatmap-opacity': 0.62,
+          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3, 0.68, 7, 0.92, 11, 1.1, 15, 1.25],
+          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3, 28, 7, 22, 10, 15, 13, 9, 15, 7],
+          'heatmap-opacity': 0.54,
           'heatmap-color': [
-            'interpolate', ['linear'], ['heatmap-density'],
+            'interpolate',
+            ['linear'],
+            ['heatmap-density'],
             0, 'rgba(0,70,255,0)',
             0.16, '#164fff',
             0.34, '#00b9ff',
@@ -224,41 +274,6 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       });
 
       instance.addLayer({
-        id: 'meghnetra-wind-vectors',
-        type: 'line',
-        source: 'meghnetra-wind-vectors',
-        slot: 'top',
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: {
-          'line-color': '#7ee8ff',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 3, 0.7, 8, 1.35, 13, 2],
-          'line-opacity': 0.72,
-          'line-dasharray': [0.25, 1.4],
-        },
-      });
-
-      instance.addLayer({
-        id: 'meghnetra-wind-arrows',
-        type: 'symbol',
-        source: 'meghnetra-wind-vectors',
-        slot: 'top',
-        minzoom: 4,
-        layout: {
-          'text-field': '➜',
-          'text-size': ['interpolate', ['linear'], ['zoom'], 4, 8, 9, 12],
-          'text-rotate': ['get', 'direction'],
-          'text-allow-overlap': true,
-          'text-ignore-placement': true,
-        },
-        paint: {
-          'text-color': '#9befff',
-          'text-halo-color': '#03101b',
-          'text-halo-width': 1.5,
-          'text-opacity': ['case', ['==', layer, 'wind'], 0.9, 0.22],
-        },
-      });
-
-      instance.addLayer({
         id: 'meghnetra-event-glow',
         type: 'circle',
         source: 'meghnetra-events',
@@ -266,7 +281,8 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 10, 9, 17, 14, 25],
           'circle-color': [
-            'match', ['get', 'severity'],
+            'match',
+            ['get', 'severity'],
             'High', '#ff5266',
             'Medium', '#ffc04f',
             '#25c8ff',
@@ -284,7 +300,8 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 3.5, 9, 7, 14, 10],
           'circle-color': [
-            'match', ['get', 'severity'],
+            'match',
+            ['get', 'severity'],
             'High', '#ff6673',
             'Medium', '#ffbf52',
             '#24c8ff',
@@ -314,6 +331,32 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
           'text-emissive-strength': 1,
         },
       });
+
+      const refreshField = () => {
+        const source = instance.getSource('meghnetra-field') as mapboxgl.GeoJSONSource | undefined;
+        if (!source) return;
+        const zoom = instance.getZoom();
+        source.setData({
+          type: 'FeatureCollection',
+          features: buildWeatherField(eventsRef.current, zoom, instance.getBounds()),
+        });
+      };
+
+      let refreshTimer: number | undefined;
+      const scheduleRefresh = () => {
+        window.clearTimeout(refreshTimer);
+        refreshTimer = window.setTimeout(refreshField, 110);
+      };
+
+      instance.on('zoomend', scheduleRefresh);
+      instance.on('moveend', scheduleRefresh);
+      refreshField();
+
+      instance.once('remove', () => {
+        window.clearTimeout(refreshTimer);
+        instance.off('zoomend', scheduleRefresh);
+        instance.off('moveend', scheduleRefresh);
+      });
     });
 
     instance.on('click', 'meghnetra-event-core', event => {
@@ -330,7 +373,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       instance.remove();
       map.current = null;
     };
-  }, [events, onSelect, weatherField, windVectors]);
+  }, [events, initialField, onSelect]);
 
   useEffect(() => {
     const instance = map.current;
@@ -357,16 +400,19 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
     const marker = document.createElement('button');
     marker.type = 'button';
     marker.className = 'meghnetra-selected-marker';
-    marker.setAttribute('aria-label', `Selected event: ${selected.city}`);
-    marker.innerHTML = '<span class="marker-ring"></span><span class="marker-ring ring-2"></span><span class="marker-core"></span><span class="marker-label"></span>';
+    marker.setAttribute('aria-label', \`Selected event: \${selected.city}\`);
+    marker.innerHTML =
+      '<span class="marker-ring"></span><span class="marker-ring ring-2"></span><span class="marker-core"></span><span class="marker-label"></span>';
     const label = marker.querySelector('.marker-label');
-    if (label) label.textContent = `${selected.type} · ${selected.confidence}%`;
+    if (label) label.textContent = \`\${selected.type} · \${selected.confidence}%\`;
     marker.addEventListener('click', () => onSelect(selected));
 
     const selectedMarker = new mapboxgl.Marker({
       element: marker,
       anchor: 'center',
-    }).setLngLat(target).addTo(instance);
+    })
+      .setLngLat(target)
+      .addTo(instance);
     markerRefs.current.push(selectedMarker);
   }, [selected, mode, onSelect]);
 
@@ -375,28 +421,15 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
     if (!instance) return;
 
     const source = instance.getSource('meghnetra-field') as mapboxgl.GeoJSONSource | undefined;
-    const windSource = instance.getSource('meghnetra-wind-vectors') as mapboxgl.GeoJSONSource | undefined;
-    if (!source || !windSource) return;
-
-    source.setData({ type: 'FeatureCollection', features: weatherField });
-    windSource.setData(windVectors);
+    if (!source) return;
 
     const config = layerConfig[layer];
-    if (instance.getLayer('meghnetra-weather-field')) {
-      instance.setPaintProperty(
-        'meghnetra-weather-field',
-        'heatmap-weight',
-        ['interpolate', ['linear'], ['get', config.field], config.min, 0, config.max, 1],
-      );
-    }
-    if (instance.getLayer('meghnetra-wind-arrows')) {
-      instance.setPaintProperty(
-        'meghnetra-wind-arrows',
-        'text-opacity',
-        layer === 'wind' ? 0.95 : 0.2,
-      );
-    }
-  }, [layer, weatherField, windVectors]);
+    instance.setPaintProperty(
+      'meghnetra-weather-field',
+      'heatmap-weight',
+      ['interpolate', ['linear'], ['get', config.field], config.min, 0, config.max, 1],
+    );
+  }, [layer]);
 
   useEffect(() => {
     const canvas = windCanvas.current;
@@ -405,10 +438,31 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
 
     let frame = 0;
     let running = true;
-    const particles = Array.from({ length: 90 }, (_, index) => ({
-      seed: index * 17.371,
-      progress: (index * 0.071) % 1,
-    }));
+    let lastTime = 0;
+    let particles: Array<{ lng: number; lat: number; age: number; life: number; seed: number }> = [];
+
+    const hash = (n: number) => {
+      const x = Math.sin(n * 12.9898) * 43758.5453;
+      return x - Math.floor(x);
+    };
+
+    const resetParticle = (index: number, bounds: mapboxgl.LngLatBounds) => {
+      const seed = index * 31.731 + instance.getZoom() * 7.17;
+      return {
+        lng: bounds.getWest() + hash(seed) * (bounds.getEast() - bounds.getWest()),
+        lat: bounds.getSouth() + hash(seed + 9.31) * (bounds.getNorth() - bounds.getSouth()),
+        age: hash(seed + 3.7),
+        life: 0.65 + hash(seed + 6.4) * 1.6,
+        seed,
+      };
+    };
+
+    const syncParticleDensity = () => {
+      const target = particleCount(instance.getZoom());
+      const bounds = instance.getBounds();
+      while (particles.length < target) particles.push(resetParticle(particles.length, bounds));
+      if (particles.length > target) particles.length = target;
+    };
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
@@ -419,6 +473,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
 
     const draw = (time: number) => {
       if (!running) return;
+
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
@@ -428,43 +483,83 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       ctx.clearRect(0, 0, rect.width, rect.height);
 
       if (layer === 'wind') {
-        ctx.lineCap = 'round';
-        particles.forEach((particle, index) => {
-          const t = ((time * 0.000025 * (1 + (index % 5) * 0.12)) + particle.progress) % 1;
-          const lng = 68 + ((particle.seed * 1.7 + t * 29) % 29);
-          const lat = 8 + ((particle.seed * 0.83 + Math.sin(t * Math.PI * 2 + particle.seed) * 2.5) % 27);
-          const wind = 8 + 8 * Math.abs(Math.sin((lng + lat) / 7));
-          const dir = (58 + 38 * Math.sin((lng + lat) / 9)) * Math.PI / 180;
-          const nextLng = lng + Math.sin(dir) * 0.28;
-          const nextLat = lat + Math.cos(dir) * 0.28;
+        syncParticleDensity();
+        const bounds = instance.getBounds();
+        const dt = Math.min(0.032, Math.max(0.008, (time - lastTime) / 1000 || 0.016));
+        lastTime = time;
 
-          const a = instance.project([lng, lat]);
-          const b = instance.project([nextLng, nextLat]);
-          const alpha = 0.18 + Math.min(0.55, wind / 20);
-          ctx.strokeStyle = `rgba(126, 232, 255, ${alpha})`;
-          ctx.lineWidth = 1 + wind / 22;
+        particles.forEach((particle, index) => {
+          const vector = windVector(particle.lng, particle.lat, eventsRef.current);
+          const zoomFactor = Math.max(0.018, Math.min(0.075, vector.speed / 520));
+          particle.lng += vector.u * zoomFactor * dt * 60;
+          particle.lat += vector.v * zoomFactor * dt * 60;
+          particle.age += dt / particle.life;
+
+          if (
+            particle.age > 1 ||
+            particle.lng < bounds.getWest() - 0.2 ||
+            particle.lng > bounds.getEast() + 0.2 ||
+            particle.lat < bounds.getSouth() - 0.2 ||
+            particle.lat > bounds.getNorth() + 0.2
+          ) {
+            particles[index] = resetParticle(index, bounds);
+            return;
+          }
+
+          const tailScale = Math.max(0.035, Math.min(0.16, vector.speed / 260));
+          const tailLng = particle.lng - vector.u * tailScale;
+          const tailLat = particle.lat - vector.v * tailScale;
+
+          const a = instance.project([tailLng, tailLat]);
+          const b = instance.project([particle.lng, particle.lat]);
+
+          const lifeFade = Math.sin(Math.min(1, particle.age) * Math.PI);
+          const alpha = (0.18 + Math.min(0.58, vector.speed / 38)) * lifeFade;
+
+          ctx.strokeStyle = \`rgba(115, 231, 255, \${alpha})\`;
+          ctx.lineWidth = instance.getZoom() > 10 ? 1.15 : 0.85;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           ctx.lineTo(b.x, b.y);
           ctx.stroke();
+
+          const angle = Math.atan2(b.y - a.y, b.x - a.x);
+          const head = instance.getZoom() > 11 ? 3.5 : 2.8;
+
+          ctx.fillStyle = \`rgba(174, 244, 255, \${Math.min(0.82, alpha + 0.12)})\`;
+          ctx.beginPath();
+          ctx.moveTo(b.x, b.y);
+          ctx.lineTo(
+            b.x - Math.cos(angle - 0.48) * head,
+            b.y - Math.sin(angle - 0.48) * head,
+          );
+          ctx.lineTo(
+            b.x - Math.cos(angle + 0.48) * head,
+            b.y - Math.sin(angle + 0.48) * head,
+          );
+          ctx.closePath();
+          ctx.fill();
         });
       }
 
       frame = requestAnimationFrame(draw);
     };
 
+    syncParticleDensity();
     resize();
     window.addEventListener('resize', resize);
-    instance.on('move', resize);
     instance.on('resize', resize);
+    instance.on('zoomend', syncParticleDensity);
+    instance.on('moveend', syncParticleDensity);
     frame = requestAnimationFrame(draw);
 
     return () => {
       running = false;
       cancelAnimationFrame(frame);
       window.removeEventListener('resize', resize);
-      instance.off('move', resize);
       instance.off('resize', resize);
+      instance.off('zoomend', syncParticleDensity);
+      instance.off('moveend', syncParticleDensity);
     };
   }, [layer]);
 
@@ -472,33 +567,40 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
     <div className="interactive-map">
       <div ref={container} className="mapbox-canvas" />
       <canvas ref={windCanvas} className="wind-particle-canvas" aria-hidden="true" />
+
       {!token && (
         <div className="map-engine-notice">
           <strong>MAP ENGINE READY</strong>
           <span>Set NEXT_PUBLIC_MAPBOX_TOKEN to activate the national 2D/3D weather engine.</span>
         </div>
       )}
+
       <div className="map-layer-badge">
         <span>{layerConfig[layer].label}</span>
         <b>{layerConfig[layer].unit}</b>
       </div>
+
       <div className="map-data-strip">
         <span><i className="live-dot" /> DEMO WEATHER FIELD</span>
         <span>06:00–13:30 IST</span>
         <span>{mode === '3D' ? '3D TERRAIN + CITY MODEL' : 'NATIONAL 2D FIELD'}</span>
       </div>
+
       {layer === 'wind' && (
         <div className="wind-intel-card">
           <div className="wind-intel-head">
-            <span>WIND VECTOR</span>
+            <span>WIND FIELD</span>
             <b>10 m AGL</b>
           </div>
           <strong>{selectedWind.speed.toFixed(1)} <small>km/h</small></strong>
           <div className="wind-direction">
-            <span style={{ transform: `rotate(${selectedWind.direction}deg)` }}>↑</span>
-            <div><b>{selectedWind.cardinal}</b><small>{selectedWind.direction}° · gust {selectedWind.gust.toFixed(1)} km/h</small></div>
+            <span style={{ transform: \`rotate(\${selectedWind.direction}deg)\` }}>↑</span>
+            <div>
+              <b>{selectedWind.cardinal}</b>
+              <small>{selectedWind.direction}° · gust {selectedWind.gust.toFixed(1)} km/h</small>
+            </div>
           </div>
-          <em>Synthetic prototype field · ready for real wind raster adapter</em>
+          <em>Flow density increases continuously with zoom.</em>
         </div>
       )}
     </div>
