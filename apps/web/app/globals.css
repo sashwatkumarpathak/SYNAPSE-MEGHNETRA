@@ -1309,9 +1309,15 @@ button {
 }
 .mapbox-canvas {
     position: absolute;
-    inset: 0
+    inset: 0;
+    width: 100%;
+    height: 100%
 }
 .interactive-map .mapboxgl-map {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     font-family: Inter, Arial, sans-serif
 }
 .interactive-map .mapboxgl-ctrl-group {
