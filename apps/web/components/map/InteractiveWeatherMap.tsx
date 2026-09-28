@@ -151,7 +151,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       bearing: 0,
       projection: 'mercator',
       antialias: true,
-      attributionControl: false,
+      attributionControl: { compact: true },
     });
 
     instance.addControl(new mapboxgl.NavigationControl({ showCompass: true, visualizePitch: true }), 'bottom-right');
