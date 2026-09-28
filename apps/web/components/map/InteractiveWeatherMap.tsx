@@ -68,9 +68,9 @@ function gridSpacing(zoom: number) {
   return 0.075;
 }
 
-function clampBounds(bounds?: mapboxgl.LngLatBoundsLike) {
+function clampBounds(bounds?: mapboxgl.LngLatBounds) {
   if (!bounds) return { west: 68, south: 8, east: 97, north: 35 };
-  const b = new mapboxgl.LngLatBounds(bounds);
+  const b = bounds;
   return {
     west: Math.max(67, b.getWest() - 0.5),
     south: Math.max(6, b.getSouth() - 0.5),
