@@ -1190,3 +1190,111 @@ button {
     background: #35df9a;
     box-shadow: 0 0 10px rgba(53,223,154,.65)
 }
+
+/* Phase 1 map intelligence controls */
+.layer-control {
+    position: absolute;
+    top: 48px;
+    left: 17px;
+    z-index: 4;
+    width: 168px;
+    border: 1px solid var(--line);
+    background: rgba(2,12,21,.82);
+    backdrop-filter: blur(12px);
+    border-radius: 10px;
+    overflow: hidden
+}
+.layer-control-toggle {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: #80a1b7;
+    padding: 9px 10px;
+    text-align: left;
+    font-size: 8px;
+    letter-spacing: .11em;
+    display: flex;
+    justify-content: space-between
+}
+.layer-control-list {
+    border-top: 1px solid var(--line);
+    padding: 4px
+}
+.layer-control-list button {
+    width: 100%;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #66859a;
+    padding: 7px 7px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 9px;
+    text-align: left
+}
+.layer-control-list button:hover,
+.layer-control-list button.active {
+    color: #dff6ff;
+    background: rgba(36,200,255,.07);
+    border-color: rgba(36,200,255,.1)
+}
+.layer-control-list button i {
+    margin-left: auto;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #294c61
+}
+.layer-control-list button.active i {
+    background: var(--cyan);
+    box-shadow: 0 0 8px rgba(36,200,255,.7)
+}
+.view-mode-toggle {
+    position: absolute;
+    top: 17px;
+    right: 17px;
+    z-index: 4;
+    display: flex;
+    padding: 3px;
+    border: 1px solid var(--line);
+    background: rgba(2,12,21,.78);
+    border-radius: 9px
+}
+.view-mode-toggle button {
+    border: 0;
+    background: transparent;
+    color: #59788e;
+    border-radius: 6px;
+    padding: 6px 9px;
+    font-size: 8px;
+    font-weight: 700
+}
+.view-mode-toggle button.active {
+    color: #e6f8ff;
+    background: rgba(36,200,255,.12)
+}
+.layer-readout {
+    position: absolute;
+    right: 17px;
+    bottom: 59px;
+    z-index: 3;
+    border: 1px solid var(--line);
+    background: rgba(2,12,21,.7);
+    border-radius: 7px;
+    padding: 6px 8px;
+    color: #496a80;
+    font-size: 7px;
+    letter-spacing: .08em
+}
+.layer-readout b {
+    color: #77c9e8
+}
+.india-outline.mode-3d {
+    transform: perspective(700px) rotateX(8deg) rotateY(-4deg) scale(1.05);
+    transition: transform .42s ease
+}
+@media(max-width:480px) {
+    .layer-control { width: 148px; top: 46px }
+    .layer-readout { bottom: 55px; right: 10px }
+}
