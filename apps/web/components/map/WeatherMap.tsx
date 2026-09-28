@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { events, WeatherEvent } from '@/lib/demo-data';
 import { LayerControl, WeatherLayer } from './LayerControl';
 import { ViewModeToggle } from './ViewModeToggle';
+import { InteractiveWeatherMap } from './InteractiveWeatherMap';
 
 function PlusIcon(){return <span className="pm">+</span>}
 function MinusIcon(){return <span className="pm">−</span>}
@@ -12,6 +13,10 @@ function MinusIcon(){return <span className="pm">−</span>}
 export function WeatherMap({selected,setSelected}:{selected:WeatherEvent,setSelected:(e:WeatherEvent)=>void}){
   const [layer,setLayer]=useState<WeatherLayer>('rainfall');
   const [mode,setMode]=useState<'2D'|'3D'>('2D');
+  if (process.env.NEXT_PUBLIC_MAPBOX_TOKEN) {
+    return <div className="map-shell"><InteractiveWeatherMap events={events} selected={selected} mode={mode} layer={layer} onSelect={setSelected}/></div>;
+  }
+
   return <div className="map-shell">
     <div className="map-grid"/>
     <div className="map-scan"/>
