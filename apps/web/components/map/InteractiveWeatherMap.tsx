@@ -357,10 +357,10 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
     const marker = document.createElement('button');
     marker.type = 'button';
     marker.className = 'meghnetra-selected-marker';
-    marker.setAttribute('aria-label', \`Selected event: \${selected.city}\`);
+    marker.setAttribute('aria-label', `Selected event: ${selected.city}`);
     marker.innerHTML = '<span class="marker-ring"></span><span class="marker-ring ring-2"></span><span class="marker-core"></span><span class="marker-label"></span>';
     const label = marker.querySelector('.marker-label');
-    if (label) label.textContent = \`\${selected.type} · \${selected.confidence}%\`;
+    if (label) label.textContent = `${selected.type} · ${selected.confidence}%`;
     marker.addEventListener('click', () => onSelect(selected));
 
     const selectedMarker = new mapboxgl.Marker({
@@ -441,7 +441,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
           const a = instance.project([lng, lat]);
           const b = instance.project([nextLng, nextLat]);
           const alpha = 0.18 + Math.min(0.55, wind / 20);
-          ctx.strokeStyle = \`rgba(126, 232, 255, \${alpha})\`;
+          ctx.strokeStyle = `rgba(126, 232, 255, ${alpha})`;
           ctx.lineWidth = 1 + wind / 22;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
@@ -495,7 +495,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
           </div>
           <strong>{selectedWind.speed.toFixed(1)} <small>km/h</small></strong>
           <div className="wind-direction">
-            <span style={{ transform: \`rotate(\${selectedWind.direction}deg)\` }}>↑</span>
+            <span style={{ transform: `rotate(${selectedWind.direction}deg)` }}>↑</span>
             <div><b>{selectedWind.cardinal}</b><small>{selectedWind.direction}° · gust {selectedWind.gust.toFixed(1)} km/h</small></div>
           </div>
           <em>Synthetic prototype field · ready for real wind raster adapter</em>
