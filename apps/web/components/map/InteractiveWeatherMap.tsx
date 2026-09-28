@@ -400,11 +400,11 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
     const marker = document.createElement('button');
     marker.type = 'button';
     marker.className = 'meghnetra-selected-marker';
-    marker.setAttribute('aria-label', \`Selected event: \${selected.city}\`);
+    marker.setAttribute('aria-label', `Selected event: ${selected.city}`);
     marker.innerHTML =
       '<span class="marker-ring"></span><span class="marker-ring ring-2"></span><span class="marker-core"></span><span class="marker-label"></span>';
     const label = marker.querySelector('.marker-label');
-    if (label) label.textContent = \`\${selected.type} · \${selected.confidence}%\`;
+    if (label) label.textContent = `${selected.type} · ${selected.confidence}%`;
     marker.addEventListener('click', () => onSelect(selected));
 
     const selectedMarker = new mapboxgl.Marker({
@@ -516,7 +516,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
           const lifeFade = Math.sin(Math.min(1, particle.age) * Math.PI);
           const alpha = (0.18 + Math.min(0.58, vector.speed / 38)) * lifeFade;
 
-          ctx.strokeStyle = \`rgba(115, 231, 255, \${alpha})\`;
+          ctx.strokeStyle = `rgba(115, 231, 255, ${alpha})`;
           ctx.lineWidth = instance.getZoom() > 10 ? 1.15 : 0.85;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
@@ -526,7 +526,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
           const angle = Math.atan2(b.y - a.y, b.x - a.x);
           const head = instance.getZoom() > 11 ? 3.5 : 2.8;
 
-          ctx.fillStyle = \`rgba(174, 244, 255, \${Math.min(0.82, alpha + 0.12)})\`;
+          ctx.fillStyle = `rgba(174, 244, 255, ${Math.min(0.82, alpha + 0.12)})`;
           ctx.beginPath();
           ctx.moveTo(b.x, b.y);
           ctx.lineTo(
@@ -594,7 +594,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
           </div>
           <strong>{selectedWind.speed.toFixed(1)} <small>km/h</small></strong>
           <div className="wind-direction">
-            <span style={{ transform: \`rotate(\${selectedWind.direction}deg)\` }}>↑</span>
+            <span style={{ transform: `rotate(${selectedWind.direction}deg)` }}>↑</span>
             <div>
               <b>{selectedWind.cardinal}</b>
               <small>{selectedWind.direction}° · gust {selectedWind.gust.toFixed(1)} km/h</small>
