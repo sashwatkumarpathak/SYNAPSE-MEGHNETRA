@@ -1,6 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { Bell, ChevronDown, CloudRain, Crosshair, Database, Globe2, Layers3, MapPin, Menu, Radio, Search, ShieldCheck, Sparkles, Wind, Zap } from 'lucide-react';
+import { Bell, ChevronDown, CloudRain, Globe2, MapPin, Radio, ShieldCheck, Sparkles, Wind, Zap } from 'lucide-react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { events, nationalStats, WeatherEvent } from '@/lib/demo-data';
 import { Card } from '@/components/ui/card';
@@ -13,7 +13,7 @@ const nav=[['Live Map',Globe2],['Weather Layers',Layers3],['Reports',Database],[
 
 function Stat({label,value,sub,icon:Icon}:{label:string,value:string,sub:string,icon:any}){return <Card className="stat-card"><div className="stat-icon"><Icon size={17}/></div><div><div className="stat-label">{label}</div><div className="stat-value">{value}</div><div className="stat-sub">{sub}</div></div></Card>}
 function PlusIcon(){return <span className="pm">+</span>} function MinusIcon(){return <span className="pm">−</span>}
-function PlusIcon(){return <span className="pm">+</span>} function MinusIcon(){return <span className="pm">−</span>}
+
 function EventCard({event,onClick}:{event:WeatherEvent,onClick:()=>void}){return <button className="event-row" onClick={onClick}><div className={`event-symbol ${event.type.includes('Rain')?'rainy':'stormy'}`}>{event.type.includes('Rain')?<CloudRain size={18}/>:<Wind size={18}/>}</div><div className="event-main"><strong>{event.type}</strong><span><MapPin size={11}/> {event.city}, {event.state}</span></div><div className="event-confidence"><b>{event.confidence}%</b><small>confidence</small></div><span className={`status-dot ${event.verified?'ok':'review'}`}/></button>}
 export default function Home(){
  const [selected,setSelected]=useState(events[0]); const [mobile,setMobile]=useState(false); const [query,setQuery]=useState(''); const [activeSection,setActiveSection]=useState<ShellSection>('Live Map');
