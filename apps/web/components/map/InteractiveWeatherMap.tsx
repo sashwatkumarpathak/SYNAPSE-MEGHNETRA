@@ -147,8 +147,8 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       },
       center: initial,
       zoom: 4.25,
-      pitch: mode === '3D' ? 42 : 0,
-      bearing: mode === '3D' ? -8 : 0,
+      pitch: 0,
+      bearing: 0,
       projection: 'mercator',
       antialias: true,
       attributionControl: false,
@@ -330,7 +330,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       instance.remove();
       map.current = null;
     };
-  }, [events, onSelect, weatherField, windVectors, mode]);
+  }, [events, onSelect, weatherField, windVectors]);
 
   useEffect(() => {
     const instance = map.current;
