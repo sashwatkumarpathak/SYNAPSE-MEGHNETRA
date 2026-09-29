@@ -1,7 +1,7 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
-import { MapPin, ShieldCheck } from 'lucide-react';
+import { MapPin, ShieldCheck, ExternalLink } from 'lucide-react';
 import type { WeatherEvent } from '@/lib/demo-data';
 
 export function EventIntelligencePanel({event}:{event:WeatherEvent}){
@@ -21,11 +21,11 @@ export function EventIntelligencePanel({event}:{event:WeatherEvent}){
       <div className="section-label">EVIDENCE SOURCES <span>{event.sources} correlated</span></div>
       {['IMD Observation','Weather API','Citizen Reports','Geospatial Correlation']
         .slice(0, Math.min(4,event.sources))
-        .map((source,index)=><div className="source" key={source}>
-          <span className="source-check">✓</span>{source}
-          <small>{index===0?'official':index===1?'live':'correlated'}</small>
-        </div>)}
+        .map((source,index)=><button className="source source-button" key={source} type="button">
+          <span className="source-check">✓</span><span>{source}</span>
+          <small>{index===0?'OFFICIAL':index===1?'LIVE':'CORRELATED'}</small>
+        </button>)}
     </div>
-    <button className="detail-btn">Open event intelligence <span>→</span></button>
+    <button className="detail-btn" type="button">Open event intelligence <ExternalLink size={14}/></button>
   </Card>
 }
