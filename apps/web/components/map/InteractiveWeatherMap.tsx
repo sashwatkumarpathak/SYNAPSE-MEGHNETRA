@@ -79,7 +79,7 @@ function clampBounds(bounds?: mapboxgl.LngLatBounds) {
   };
 }
 
-function buildWeatherField(events: WeatherEvent[], zoom = 4.25, bounds?: mapboxgl.LngLatBoundsLike): FieldPoint[] {
+function buildWeatherField(events: WeatherEvent[], zoom = 4.25, bounds?: mapboxgl.LngLatBounds): FieldPoint[] {
   const { west, south, east, north } = clampBounds(bounds);
   const spacing = gridSpacing(zoom);
   const points: FieldPoint[] = [];
