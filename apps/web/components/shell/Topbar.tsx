@@ -4,7 +4,6 @@ import { Bell, Menu, Search, ShieldCheck, X } from 'lucide-react';
 import { useState } from 'react';
 import type { WeatherEvent } from '@/lib/demo-data';
 import { CommandPalette } from './CommandPalette';
-import { SystemStatus } from './SystemStatus';
 import type { ShellSection } from './Sidebar';
 
 type TopbarProps = {
