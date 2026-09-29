@@ -458,10 +458,13 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       };
     };
 
+    const syncParticleDensity = () => {
+      const target = particleCount(instance.getZoom());
       const bounds = instance.getBounds();
       if (!bounds) return;
-      while (particles.length < target) particles.push(resetParticle(particles.length, bounds));
-      while (particles.length < target) particles.push(resetParticle(particles.length, bounds));
+      while (particles.length < target) {
+        particles.push(resetParticle(particles.length, bounds));
+      }
       if (particles.length > target) particles.length = target;
     };
 
