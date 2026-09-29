@@ -1670,14 +1670,33 @@ button {
   height:100%;
   display:grid;
   place-items:center;
-  overflow:hidden;
+  overflow:visible;
+  pointer-events:none;
   animation:loadingArtIn 1.25s cubic-bezier(.16,1,.3,1) both;
 }
+.loading-art::before{
+  content:'';
+  position:absolute;
+  width:min(92vw,calc((100vh - 150px) * 1.5));
+  height:min(82vh,calc(92vw / 1.5));
+  border:1px solid rgba(57,210,255,.12);
+  box-shadow:0 0 55px rgba(21,155,255,.06),inset 0 0 45px rgba(21,155,255,.025);
+  pointer-events:none;
+}
+.loading-art::after{
+  content:'';
+  position:absolute;
+  width:min(92vw,calc((100vh - 150px) * 1.5));
+  height:min(82vh,calc(92vw / 1.5));
+  border:1px solid rgba(255,255,255,.035);
+  transform:scale(.992);
+  pointer-events:none;
+}
 .loading-art img{
-  width:100%;
-  height:100%;
-  max-width:100%;
-  max-height:100%;
+  width:auto;
+  height:auto;
+  max-width:92vw;
+  max-height:calc(100vh - 150px);
   object-fit:contain;
   object-position:center;
   display:block;
@@ -1746,24 +1765,24 @@ button {
 .loading-status{
   position:absolute;
   z-index:5;
-  top:18px;
-  bottom:auto;
+  bottom:15px;
+  top:auto;
   left:50%;
   transform:translateX(-50%);
   width:min(680px,72vw);
-  min-height:32px;
-  padding:8px 12px;
+  min-height:30px;
+  padding:7px 12px;
   border:1px solid rgba(111,205,240,.12);
   border-radius:999px;
-  background:rgba(2,10,17,.58);
+  background:rgba(2,10,17,.72);
   backdrop-filter:blur(12px);
   display:flex;
   align-items:center;
   gap:9px;
   color:#7195ab;
-  font-size:9px;
+  font-size:8px;
   letter-spacing:.15em;
-  box-shadow:0 10px 35px rgba(0,0,0,.18);
+  box-shadow:0 10px 35px rgba(0,0,0,.22);
 }
 .loading-status-dot{
   width:6px;
@@ -1783,8 +1802,8 @@ button {
 .loading-progress{
   position:absolute;
   z-index:5;
-  top:58px;
-  bottom:auto;
+  bottom:8px;
+  top:auto;
   left:50%;
   transform:translateX(-50%);
   width:min(680px,72vw);
@@ -1796,8 +1815,8 @@ button {
 .loading-meta{
   position:absolute;
   z-index:5;
-  top:69px;
-  bottom:auto;
+  bottom:34px;
+  top:auto;
   left:50%;
   transform:translateX(-50%);
   width:min(680px,72vw);
@@ -1915,9 +1934,11 @@ button {
 
 @media(max-width:600px){
   .loading-art{width:100vw;height:100vh}
-  .loading-status{top:10px;width:calc(100vw - 24px);font-size:7px;letter-spacing:.08em;padding:7px 9px}
-  .loading-progress{top:47px;width:calc(100vw - 24px)}
-  .loading-meta{top:57px;width:calc(100vw - 24px);font-size:6px;letter-spacing:.12em}
+  .loading-art img{max-width:94vw;max-height:calc(100vh - 120px)}
+  .loading-art::before,.loading-art::after{width:94vw;height:calc(94vw / 1.5)}
+  .loading-status{bottom:10px;width:calc(100vw - 24px);font-size:7px;letter-spacing:.07em;padding:6px 9px}
+  .loading-progress{bottom:4px;width:calc(100vw - 24px)}
+  .loading-meta{bottom:29px;width:calc(100vw - 24px);font-size:6px;letter-spacing:.1em}
   .page-head h1{font-size:28px}
   .page-head p{font-size:13px}
   .section-view h1{font-size:26px}
