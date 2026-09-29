@@ -198,7 +198,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       bearing: 0,
       projection: 'mercator',
       antialias: true,
-      attributionControl: { compact: true },
+      attributionControl: false,
     });
 
     instance.addControl(
@@ -338,7 +338,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
         const zoom = instance.getZoom();
         source.setData({
           type: 'FeatureCollection',
-          features: buildWeatherField(eventsRef.current, zoom, instance.getBounds()),
+          features: buildWeatherField(eventsRef.current, zoom, instance.getBounds() ?? undefined),
         });
       };
 
@@ -360,7 +360,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
     });
 
     instance.on('click', 'meghnetra-event-core', event => {
-      const id = event.features?.[0]?.properties?.id;
+      const feature = event.features?.[0] as (GeoJSON.Feature<GeoJSON.Geometry, { id?: string }> | undefined);\n      const id = feature?.properties?.id;
       const match = events.find(item => item.id === id);
       if (match) onSelect(match);
     });
