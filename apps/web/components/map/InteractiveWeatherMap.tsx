@@ -249,6 +249,13 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       });
       instance.setTerrain({ source: 'meghnetra-terrain', exaggeration: 1.08 });
 
+      // Mapbox's country polygons give the renderer a real India-only visual context.
+      // The weather samples are separately clipped in buildWeatherField for performance.
+      instance.addSource('meghnetra-countries', {
+        type: 'vector',
+        url: 'mapbox://mapbox.country-boundaries-v1',
+      });
+
       instance.addSource('meghnetra-field', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: initialField },
@@ -277,6 +284,46 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
               visibility: Math.max(1, 12 - event.rain * 0.8),
             },
           })),
+        },
+      });
+
+      instance.addLayer({
+        id: 'meghnetra-outside-india',
+        type: 'fill',
+        source: 'meghnetra-countries',
+        'source-layer': 'country_boundaries',
+        slot: 'middle',
+        minzoom: 0,
+        maxzoom: 22,
+        filter: ['all',
+          ['!=', ['get', 'iso_3166_1'], 'IN'],
+          ['==', ['get', 'disputed'], 'false'],
+        ],
+        paint: {
+          'fill-color': '#02070d',
+          'fill-opacity': 0.48,
+        },
+      });
+
+      instance.addLayer({
+        id: 'meghnetra-india-outline',
+        type: 'line',
+        source: 'meghnetra-countries',
+        'source-layer': 'country_boundaries',
+        slot: 'top',
+        minzoom: 0,
+        maxzoom: 22,
+        filter: ['all',
+          ['==', ['get', 'iso_3166_1'], 'IN'],
+          ['any',
+            ['==', ['get', 'worldview'], 'all'],
+            ['in', 'IN', ['get', 'worldview']],
+          ],
+        ],
+        paint: {
+          'line-color': '#55dfff',
+          'line-opacity': 0.34,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 3, 0.7, 9, 1.2, 16, 1.8],
         },
       });
 
@@ -417,7 +464,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
     const target = coords[selected.city] ?? [78.9629, 20.5937];
     instance.easeTo({
       center: target,
-      zoom: mode === '3D' ? 13.2 : 4.9,
+      zoom: mode === '3D' ? 13.2 : 5.35,
       pitch: mode === '3D' ? 61 : 0,
       bearing: mode === '3D' ? -18 : 0,
       duration: 1100,
