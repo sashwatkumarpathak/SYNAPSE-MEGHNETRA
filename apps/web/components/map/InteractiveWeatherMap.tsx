@@ -360,7 +360,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
     });
 
     instance.on('click', 'meghnetra-event-core', event => {
-      const feature = event.features?.[0] as (GeoJSON.Feature<GeoJSON.Geometry, { id?: string }> | undefined);
+      const feature = event.features?.[0] as { properties?: { id?: string } } | undefined;
       const id = feature?.properties?.id;
       const match = events.find(item => item.id === id);
       if (match) onSelect(match);
@@ -458,9 +458,9 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       };
     };
 
-    const syncParticleDensity = () => {
-      const target = particleCount(instance.getZoom());
       const bounds = instance.getBounds();
+      if (!bounds) return;
+      while (particles.length < target) particles.push(resetParticle(particles.length, bounds));
       while (particles.length < target) particles.push(resetParticle(particles.length, bounds));
       if (particles.length > target) particles.length = target;
     };
@@ -484,8 +484,8 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       ctx.clearRect(0, 0, rect.width, rect.height);
 
       if (layer === 'wind') {
-        syncParticleDensity();
         const bounds = instance.getBounds();
+        if (!bounds) return;
         const dt = Math.min(0.032, Math.max(0.008, (time - lastTime) / 1000 || 0.016));
         lastTime = time;
 
