@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import type { ShellSection } from './Sidebar';
 import { BarChart3, Bell, Database, FlaskConical, Map, Search, ShieldCheck, X } from 'lucide-react';
 
 type CommandItem = {
@@ -19,7 +20,7 @@ const items: CommandItem[] = [
   { label: 'Admin Panel', group: 'System', icon: Database },
 ];
 
-export function CommandPalette() {
+export function CommandPalette({onNavigate}:{onNavigate:(section:ShellSection)=>void}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -55,7 +56,7 @@ export function CommandPalette() {
         <div className="command-hint">Navigate the national weather intelligence console</div>
         <div className="command-results">
           {filtered.map(({ label, group, icon: Icon }) => (
-            <button key={label} className="command-item" onClick={() => setOpen(false)}>
+            <button key={label} className="command-item" onClick={() => { onNavigate(label as ShellSection); setOpen(false); }}>
               <span className="command-item-icon"><Icon size={15} /></span>
               <span>{label}</span>
               <small>{group}</small>
