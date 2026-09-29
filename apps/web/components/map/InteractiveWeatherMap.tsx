@@ -57,15 +57,14 @@ type FieldPoint = {
 };
 
 function gridSpacing(zoom: number) {
-  if (zoom < 5.5) return 0.85;
-  if (zoom < 6.5) return 0.62;
-  if (zoom < 7.5) return 0.46;
-  if (zoom < 8.5) return 0.34;
-  if (zoom < 9.5) return 0.25;
-  if (zoom < 10.5) return 0.18;
-  if (zoom < 11.5) return 0.13;
-  if (zoom < 12.5) return 0.095;
-  return 0.07;
+  // Dense enough for a continuous field, but only refine the grid as the camera gets closer.
+  if (zoom < 5.5) return 0.48;
+  if (zoom < 7) return 0.34;
+  if (zoom < 8.5) return 0.24;
+  if (zoom < 10) return 0.17;
+  if (zoom < 11.5) return 0.12;
+  if (zoom < 13) return 0.085;
+  return 0.06;
 }
 
 function clampBounds(bounds?: mapboxgl.LngLatBounds) {
@@ -253,10 +252,10 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
         slot: 'bottom',
         maxzoom: 15,
         paint: {
-          'heatmap-weight': ['interpolate', ['linear'], ['get', 'rain'], 0, 0, 10, 1],
-          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3, 0.68, 7, 0.92, 11, 1.1, 15, 1.25],
-          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3, 46, 6, 42, 8, 38, 10, 34, 12, 30, 15, 26],
-          'heatmap-opacity': 0.58,
+          'heatmap-weight': ['interpolate', ['linear'], ['get', 'rain'], 0, 0.03, 10, 1],
+          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3, 0.58, 7, 0.72, 11, 0.88, 15, 1.0],
+          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3, 108, 6, 96, 8, 86, 10, 78, 12, 70, 15, 62],
+          'heatmap-opacity': 0.52,
           'heatmap-color': [
             'interpolate',
             ['linear'],
@@ -573,7 +572,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
         <b>{layerConfig[layer].unit}</b>
       </div>
 
-      <div className="map-data-strip">
+      <div className="map-data-strip"><span className="map-view-state">{mode === '3D' ? '● TRUE 3D TERRAIN + CITY BUILDINGS' : '● 2D WEATHER FIELD'}</span>
         <span><i className="live-dot" /> DEMO WEATHER FIELD</span>
         <span>06:00–13:30 IST</span>
         <span>{mode === '3D' ? '3D TERRAIN + CITY MODEL' : 'NATIONAL 2D FIELD'}</span>
