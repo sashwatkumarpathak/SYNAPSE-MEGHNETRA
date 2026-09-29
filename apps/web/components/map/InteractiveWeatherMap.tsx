@@ -56,47 +56,82 @@ type FieldPoint = {
   };
 };
 
-function gridSpacing(zoom: number) {
-  // Dense enough for a continuous field, but only refine the grid as the camera gets closer.
-  if (zoom < 5.5) return 0.48;
-  if (zoom < 7) return 0.34;
-  if (zoom < 8.5) return 0.24;
-  if (zoom < 10) return 0.17;
-  if (zoom < 11.5) return 0.12;
-  if (zoom < 13) return 0.085;
-  return 0.06;
+// Simplified India outer boundary used only to keep the synthetic weather field
+// inside India. The basemap remains Mapbox; this polygon is not a political boundary source.
+const INDIA_FIELD_BOUNDARY: [number, number][] = [
+  [68.0, 23.8], [68.8, 22.0], [70.0, 20.8], [71.4, 20.0], [72.6, 18.5],
+  [73.6, 16.2], [74.2, 14.2], [75.1, 11.8], [76.3, 9.0], [77.4, 8.0],
+  [79.0, 9.1], [80.5, 11.8], [82.1, 14.0], [84.0, 16.0], [86.0, 18.2],
+  [88.0, 20.2], [89.5, 21.5], [91.0, 22.4], [92.0, 21.8], [92.8, 23.0],
+  [93.7, 24.4], [95.0, 26.0], [96.3, 27.3], [97.4, 28.4], [96.2, 29.1],
+  [94.7, 28.7], [93.2, 28.0], [91.8, 27.2], [90.6, 28.1], [89.2, 29.1],
+  [87.6, 28.7], [85.8, 27.7], [84.0, 27.2], [82.3, 28.0], [80.8, 30.0],
+  [79.2, 31.8], [77.5, 34.0], [76.0, 36.1], [74.3, 36.7], [72.8, 35.0],
+  [71.0, 32.5], [69.8, 29.8], [68.8, 27.0], [68.0, 23.8],
+];
+
+function pointInIndia(lng: number, lat: number) {
+  let inside = false;
+  for (let i = 0, j = INDIA_FIELD_BOUNDARY.length - 1; i < INDIA_FIELD_BOUNDARY.length; j = i++) {
+    const [xi, yi] = INDIA_FIELD_BOUNDARY[i];
+    const [xj, yj] = INDIA_FIELD_BOUNDARY[j];
+    const intersects = yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
 }
 
-function clampBounds(bounds?: mapboxgl.LngLatBounds) {
-  if (!bounds) return { west: 68, south: 8, east: 97, north: 35 };
-  const b = bounds;
+function gridSpacing(zoom: number, latitude = 22) {
+  // Keep samples roughly 38–46 screen pixels apart at every zoom level.
+  // This prevents the heatmap from turning into visible dots when drilling into a state/city.
+  const worldPx = 512 * Math.pow(2, zoom);
+  const degreesPerPixel = 360 / worldPx;
+  const lonSpacing = degreesPerPixel * 42;
+  const latSpacing = lonSpacing;
+  const latitudeCorrection = Math.max(0.55, Math.cos((latitude * Math.PI) / 180));
   return {
-    west: Math.max(67, b.getWest() - 0.5),
-    south: Math.max(6, b.getSouth() - 0.5),
-    east: Math.min(99, b.getEast() + 0.5),
-    north: Math.min(37, b.getNorth() + 0.5),
+    lng: Math.max(0.0045, Math.min(0.55, lonSpacing)),
+    lat: Math.max(0.0045, Math.min(0.55, latSpacing / latitudeCorrection)),
   };
 }
 
-function buildWeatherField(events: WeatherEvent[], zoom = 4.25, bounds?: mapboxgl.LngLatBounds): FieldPoint[] {
+function clampBounds(bounds?: mapboxgl.LngLatBounds) {
+  if (!bounds) return { west: 68, south: 8, east: 97, north: 37 };
+  const b = bounds;
+  return {
+    west: Math.max(67.5, b.getWest() - 0.15),
+    south: Math.max(7, b.getSouth() - 0.15),
+    east: Math.min(98, b.getEast() + 0.15),
+    north: Math.min(37, b.getNorth() + 0.15),
+  };
+}
+
+function buildWeatherField(events: WeatherEvent[], zoom = 5.35, bounds?: mapboxgl.LngLatBounds): FieldPoint[] {
   const { west, south, east, north } = clampBounds(bounds);
-  const spacing = gridSpacing(zoom);
+  const centerLat = (south + north) / 2;
+  const spacing = gridSpacing(zoom, centerLat);
   const points: FieldPoint[] = [];
 
-  for (let lat = south; lat <= north; lat += spacing) {
-    for (let lng = west; lng <= east; lng += spacing) {
-      let rain = 0.55 + 1.2 * Math.max(0, Math.sin((lng - 68) / 4.2));
+  for (let lat = south; lat <= north; lat += spacing.lat) {
+    for (let lng = west; lng <= east; lng += spacing.lng) {
+      // Never render weather intensity outside India's field boundary.
+      if (!pointInIndia(lng, lat)) continue;
+
+      // Smooth deterministic demo background. In production this is replaced by
+      // provider-adapted gridded observations/model fields without changing the renderer.
+      let rain = 0.7 + 0.65 * (0.5 + 0.5 * Math.sin((lng - 71) / 4.8 + Math.sin(lat / 6)));
       let temp = 32 - (lat - 8) * 0.38;
-      let humidity = 57 + 18 * Math.sin((lng + lat) / 8);
-      let wind = 9 + 5 * Math.sin((lng - 70) / 4) + 3 * Math.cos(lat / 5);
+      let humidity = 58 + 15 * Math.sin((lng + lat) / 8);
+      let wind = 9 + 4 * Math.sin((lng - 70) / 4) + 2.5 * Math.cos(lat / 5);
       let direction = 55 + 34 * Math.sin((lng + lat) / 9);
 
       events.forEach(event => {
         const [eLng, eLat] = coords[event.city] ?? [78.9629, 20.5937];
         const dx = (lng - eLng) * Math.cos((lat * Math.PI) / 180);
         const dy = lat - eLat;
-        const influence = Math.exp(-(dx * dx + dy * dy) / 45);
-        rain += event.rain * influence;
+        // Tighter, weather-cell-like influence prevents one event from painting Pakistan/Iran/etc.
+        const influence = Math.exp(-(dx * dx + dy * dy) / 4.5);
+        rain += Math.max(0, event.rain) * influence;
         temp += (event.temp - 30) * influence * 0.7;
         humidity += (event.humidity - 65) * influence * 0.55;
         wind += (windByCity[event.city]?.speed ?? 12) * influence * 0.16;
@@ -170,7 +205,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
   const eventsRef = useRef(events);
   eventsRef.current = events;
 
-  const initialField = useMemo(() => buildWeatherField(events), [events]);
+  const initialField = useMemo(() => buildWeatherField(events, 5.35), [events]);
   const selectedWind = windFor(selected);
 
   useEffect(() => {
@@ -192,7 +227,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
         },
       },
       center: initial,
-      zoom: 4.25,
+      zoom: 5.35,
       pitch: 0,
       bearing: 0,
       projection: 'mercator',
@@ -250,11 +285,11 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
         type: 'heatmap',
         source: 'meghnetra-field',
         slot: 'bottom',
-        maxzoom: 15,
+        maxzoom: 22,
         paint: {
           'heatmap-weight': ['interpolate', ['linear'], ['get', 'rain'], 0, 0.03, 10, 1],
-          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3, 0.58, 7, 0.72, 11, 0.88, 15, 1.0],
-          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3, 108, 6, 96, 8, 86, 10, 78, 12, 70, 15, 62],
+          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3, 0.52, 7, 0.62, 11, 0.72, 15, 0.82, 18, 0.9],
+          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3, 92, 6, 86, 9, 82, 12, 78, 15, 74, 18, 70],
           'heatmap-opacity': 0.52,
           'heatmap-color': [
             'interpolate',
