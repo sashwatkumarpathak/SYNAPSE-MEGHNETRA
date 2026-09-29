@@ -1993,7 +1993,7 @@ button {
 .source-button .source-check{font-size:11px}
 
 /* Analytics: replace the cramped scrollbar list with a clean full-page distribution. */
-.jurisdiction-list{max-height:none!important;overflow:visible!important;gap:10px}
+.jurisdiction-list{max-height:none!important;overflow:visible!important;gap:8px;grid-template-columns:repeat(2,minmax(0,1fr))}
 .jurisdiction-list>div{grid-template-columns:190px 1fr 38px!important;min-height:28px}
 .jurisdiction-list>div>span{display:flex;flex-direction:column;gap:2px}
 .jurisdiction-list>div>span b{font-size:12px;color:#cfe9f5}
@@ -2072,6 +2072,7 @@ button {
 .bars em{font-size:10px!important}
 
 @media(max-width:900px){
+  .jurisdiction-list{grid-template-columns:1fr}
   .alerts-workspace{grid-template-columns:1fr}
   .scenario-layout-v2{grid-template-columns:1fr!important}
   .scenario-map-wrap{height:330px}
