@@ -2084,3 +2084,12 @@ button {
   .scenario-map-overlay{left:8px;right:8px;gap:7px;justify-content:space-between}
   .scenario-map-overlay span{font-size:8px}
 }
+
+.alert-inline-detail{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:14px 0 18px;margin-bottom:4px;border-bottom:1px solid var(--line)}
+.alert-inline-detail h3{font-size:20px;margin:5px 0}
+.alert-inline-detail p{font-size:11px!important;color:#6e8da2!important;margin:0}
+.alert-inline-metrics{display:grid;grid-template-columns:repeat(4,minmax(65px,1fr));gap:7px}
+.alert-inline-metrics span{display:flex;flex-direction:column;gap:3px;min-width:65px}
+.alert-inline-metrics b{font-size:13px;color:#dff7ff}
+.alert-inline-metrics small{font-size:9px;color:#5e7c90}
+@media(max-width:700px){.alert-inline-detail{align-items:flex-start;flex-direction:column}.alert-inline-metrics{width:100%}}
