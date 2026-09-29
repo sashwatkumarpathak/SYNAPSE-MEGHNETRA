@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { MapPin, ShieldCheck, ExternalLink } from 'lucide-react';
 import type { WeatherEvent } from '@/lib/demo-data';
 
-export function EventIntelligencePanel({event}:{event:WeatherEvent}){
+export function EventIntelligencePanel({event,onOpen}:{event:WeatherEvent;onOpen?:()=>void}){
   return <Card className="selected-card">
     <div className="card-top">
       <span className="verified-pill"><ShieldCheck size={14}/> {event.verified?'VERIFIED':'UNDER REVIEW'}</span>
@@ -26,6 +26,6 @@ export function EventIntelligencePanel({event}:{event:WeatherEvent}){
           <small>{index===0?'OFFICIAL':index===1?'LIVE':'CORRELATED'}</small>
         </button>)}
     </div>
-    <button className="detail-btn" type="button">Open event intelligence <ExternalLink size={14}/></button>
+    <button className="detail-btn" type="button" onClick={onOpen}>Open event intelligence <ExternalLink size={14}/></button>
   </Card>
 }
