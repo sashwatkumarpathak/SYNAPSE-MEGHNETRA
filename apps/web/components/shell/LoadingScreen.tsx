@@ -2,20 +2,59 @@
 
 import { useEffect, useState } from 'react';
 
-export function LoadingScreen({onDone}:{onDone:()=>void}) {
-  const [progress,setProgress]=useState(8);
-  useEffect(()=>{
-    const timer=window.setInterval(()=>setProgress(p=>Math.min(100,p+Math.round(7+Math.random()*13))),180);
-    const done=window.setTimeout(onDone,1500);
-    return()=>{window.clearInterval(timer);window.clearTimeout(done)};
-  },[onDone]);
-  return <div className="loading-screen" aria-label="Loading MEGHNETRA">
-    <div className="loading-grid"/>
-    <div className="loading-orbit orbit-a"/><div className="loading-orbit orbit-b"/>
-    <div className="loading-core"><img src="/synapse-logo.png" alt="SYNAPSE"/><span/></div>
-    <div className="loading-wordmark">SYNAPSE<span>-MEGHNETRA</span></div>
-    <div className="loading-caption">NATIONAL WEATHER INTELLIGENCE</div>
-    <div className="loading-progress"><i style={{width:`${progress}%`}}/></div>
-    <div className="loading-meta"><span>INITIALIZING WEATHER GRAPH</span><b>{progress}%</b><span>FRONTEND DATA MODE</span></div>
-  </div>;
+export function LoadingScreen({ onDone }: { onDone: () => void }) {
+  const [progress, setProgress] = useState(6);
+
+  useEffect(() => {
+    const started = performance.now();
+    const duration = 2300;
+
+    const timer = window.setInterval(() => {
+      const elapsed = performance.now() - started;
+      const ratio = Math.min(1, elapsed / duration);
+      const eased = 1 - Math.pow(1 - ratio, 1.7);
+      setProgress(Math.max(6, Math.min(100, Math.round(eased * 100))));
+    }, 60);
+
+    const done = window.setTimeout(onDone, duration);
+
+    return () => {
+      window.clearInterval(timer);
+      window.clearTimeout(done);
+    };
+  }, [onDone]);
+
+  return (
+    <div className="loading-screen" aria-label="Loading SYNAPSE-MEGHNETRA">
+      <div className="loading-grid" />
+      <div className="loading-vignette" />
+      <div className="loading-hud hud-left" />
+      <div className="loading-hud hud-right" />
+
+      <div className="loading-art">
+        <img
+          src="/SYNAPSE-MEGHNETRA Logo.png"
+          alt="SYNAPSE-MEGHNETRA — Real Data, Reliable Insights, A Safer India"
+        />
+        <div className="loading-sweep" />
+        <div className="loading-focus-ring" />
+      </div>
+
+      <div className="loading-scanline" />
+      <div className="loading-status">
+        <span className="loading-status-dot" />
+        <span>ESTABLISHING NATIONAL WEATHER INTELLIGENCE GRAPH</span>
+        <b>{progress}%</b>
+      </div>
+
+      <div className="loading-progress">
+        <i style={{ width: `${progress}%` }} />
+      </div>
+      <div className="loading-meta">
+        <span>REAL DATA</span>
+        <span>RELIABLE INSIGHTS</span>
+        <span>A SAFER INDIA</span>
+      </div>
+    </div>
+  );
 }
