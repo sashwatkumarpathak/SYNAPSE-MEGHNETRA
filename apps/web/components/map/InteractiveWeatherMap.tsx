@@ -360,7 +360,8 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
     });
 
     instance.on('click', 'meghnetra-event-core', event => {
-      const feature = event.features?.[0] as (GeoJSON.Feature<GeoJSON.Geometry, { id?: string }> | undefined);\n      const id = feature?.properties?.id;
+      const feature = event.features?.[0] as (GeoJSON.Feature<GeoJSON.Geometry, { id?: string }> | undefined);
+      const id = feature?.properties?.id;
       const match = events.find(item => item.id === id);
       if (match) onSelect(match);
     });
