@@ -20,7 +20,7 @@ const layerUnits: Record<WeatherLayer, string> = {
 };
 
 function formatScaleValue(value: number, layer: WeatherLayer) {
-  if (layer === 'temperature') return `${value.toFixed(1)}°`;
+  if (layer === 'temperature') return `${Math.round(value)}°`;
   if (layer === 'rainfall' || layer === 'wind' || layer === 'visibility') return value.toFixed(1);
   return Math.round(value).toString();
 }
@@ -65,7 +65,7 @@ export function WeatherMap({selected,setSelected}:{selected:WeatherEvent,setSele
 
       <div className={`weather-scale weather-scale-${layer}`} aria-label={`${layer} intensity scale`}>
         <div className="weather-scale-head">
-          <span>{layer.toUpperCase()} · INDIA RANGE</span>
+          <span>{layer === 'temperature' ? 'TEMPERATURE · FIXED RANGE' : `${layer.toUpperCase()} · INDIA RANGE`}</span>
           <b>{layerUnits[layer]}</b>
         </div>
         <div className="weather-scale-bar"/>
