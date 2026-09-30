@@ -210,17 +210,23 @@ export type WeatherFieldDomain = {
   max: number;
 };
 
-const STATIC_TEMPERATURE_DOMAIN: WeatherFieldDomain = { min: -20, max: 40 };
+// Temperature colours are normalized in Fahrenheit, while all product-facing
+// temperature values remain Celsius. This keeps the visual mapping on a fixed
+// -4°F..104°F scale, exactly equivalent to -20°C..40°C.
+const STATIC_TEMPERATURE_DOMAIN_F: WeatherFieldDomain = { min: -4, max: 104 };
 
 function fieldValue(sample: WeatherSample, layer: keyof typeof layerConfig) {
-  return sample[layerConfig[layer].field as keyof WeatherSample] as number;
+  const value = sample[layerConfig[layer].field as keyof WeatherSample] as number;
+  // Convert only the value used by the temperature colour renderer.
+  // The source sample remains Celsius everywhere else in the application.
+  return layer === 'temperature' ? (value * 9) / 5 + 32 : value;
 }
 
 export function getDynamicLayerDomain(
   layer: keyof typeof layerConfig,
   events: WeatherEvent[],
 ): WeatherFieldDomain {
-  if (layer === 'temperature') return STATIC_TEMPERATURE_DOMAIN;
+  if (layer === 'temperature') return STATIC_TEMPERATURE_DOMAIN_F;
 
   const values: number[] = [];
   const samplesX = 70;
@@ -351,7 +357,7 @@ function renderWeatherRaster(
       }
 
       const sample = sampleWeather(lng, lat, events);
-      const value = sample[config.field as keyof WeatherSample] as number;
+      const value = fieldValue(sample, layer);
       const [r, g, b, a] = interpolateColor(value, layer, domain);
 
       data[index] = r;
