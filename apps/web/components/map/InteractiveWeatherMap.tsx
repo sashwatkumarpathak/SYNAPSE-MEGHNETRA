@@ -584,7 +584,13 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
 
     map.current = instance;
 
+    const resizeObserver = typeof ResizeObserver !== 'undefined' && container.current
+      ? new ResizeObserver(() => instance.resize())
+      : null;
+    resizeObserver?.observe(container.current!);
+
     return () => {
+      resizeObserver?.disconnect();
       markerRefs.current.forEach(marker => marker.remove());
       markerRefs.current = [];
       instance.remove();
