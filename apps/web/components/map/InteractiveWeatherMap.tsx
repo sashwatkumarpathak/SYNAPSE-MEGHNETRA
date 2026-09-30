@@ -210,21 +210,18 @@ export type WeatherFieldDomain = {
   max: number;
 };
 
-// Temperature colours are normalized in Fahrenheit, while all product-facing
-// temperature values remain Celsius. The domain is derived dynamically from
-// the current day's India-wide low/high temperature field.
+const STATIC_TEMPERATURE_DOMAIN: WeatherFieldDomain = { min: -20, max: 40 };
 
 function fieldValue(sample: WeatherSample, layer: keyof typeof layerConfig) {
-  const value = sample[layerConfig[layer].field as keyof WeatherSample] as number;
-  // Convert only the value used by the temperature colour renderer.
-  // The source sample remains Celsius everywhere else in the application.
-  return layer === 'temperature' ? (value * 9) / 5 + 32 : value;
+  return sample[layerConfig[layer].field as keyof WeatherSample] as number;
 }
 
 export function getDynamicLayerDomain(
   layer: keyof typeof layerConfig,
   events: WeatherEvent[],
 ): WeatherFieldDomain {
+  if (layer === 'temperature') return STATIC_TEMPERATURE_DOMAIN;
+
   const values: number[] = [];
   const samplesX = 70;
   const samplesY = 60;
@@ -243,18 +240,16 @@ export function getDynamicLayerDomain(
 
   values.sort((a, b) => a - b);
   if (!values.length) {
-    return layer === 'temperature'
-      ? { min: -4, max: 104 }
-      : { min: layerConfig[layer].min, max: layerConfig[layer].max };
+    return { min: layerConfig[layer].min, max: layerConfig[layer].max };
   }
 
   const quantile = (q: number) => values[Math.min(values.length - 1, Math.floor((values.length - 1) * q))];
-  let min = layer === 'temperature' ? values[0] : quantile(0.02);
-  let max = layer === 'temperature' ? values[values.length - 1] : quantile(0.98);
+  let min = quantile(0.02);
+  let max = quantile(0.98);
 
   const minimumSpan: Record<keyof typeof layerConfig, number> = {
     rainfall: 1.5,
-    temperature: 1,
+    temperature: 7,
     wind: 10,
     humidity: 22,
     cloud: 22,
@@ -268,18 +263,12 @@ export function getDynamicLayerDomain(
     max = center + floor / 2;
   }
 
-  if (layer !== 'temperature') {
-    const padding = (max - min) * 0.04;
-    min = Math.max(layerConfig[layer].min, min - padding);
-    max = Math.min(layerConfig[layer].max, max + padding);
-  }
+  const padding = (max - min) * 0.04;
+  min = Math.max(layerConfig[layer].min, min - padding);
+  max = Math.min(layerConfig[layer].max, max + padding);
 
   if (max <= min) {
     return { min: layerConfig[layer].min, max: layerConfig[layer].max };
-  }
-
-  if (layer === 'temperature') {
-    return { min: (min * 9) / 5 + 32, max: (max * 9) / 5 + 32 };
   }
 
   return { min, max };
@@ -362,7 +351,7 @@ function renderWeatherRaster(
       }
 
       const sample = sampleWeather(lng, lat, events);
-      const value = fieldValue(sample, layer);
+      const value = sample[config.field as keyof WeatherSample] as number;
       const [r, g, b, a] = interpolateColor(value, layer, domain);
 
       data[index] = r;
