@@ -274,6 +274,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
   const map = useRef<mapboxgl.Map | null>(null);
   const markerRefs = useRef<mapboxgl.Marker[]>([]);
   const windCanvas = useRef<HTMLCanvasElement | null>(null);
+  const weatherRasterCanvas = useRef<HTMLCanvasElement | null>(null);
   const eventsRef = useRef(events);
   eventsRef.current = events;
 
@@ -322,26 +323,26 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       });
       instance.setTerrain({ source: 'meghnetra-terrain', exaggeration: 1.08 });
 
-      // Mapbox's country polygons give the renderer a real India-only visual context.
-      // The weather samples are separately clipped in buildWeatherField for performance.
+      // Mapbox's country polygons provide the real basemap context.
+      // The weather raster itself is independently clipped to the demo India field.
       instance.addSource('meghnetra-countries', {
         type: 'vector',
         url: 'mapbox://mapbox.country-boundaries-v1',
       });
 
-      const weatherRasterCanvas = document.createElement('canvas');
-      weatherRasterCanvas.setAttribute('aria-hidden', 'true');
+      const rasterCanvas = document.createElement('canvas');
+      rasterCanvas.setAttribute('aria-hidden', 'true');
+      weatherRasterCanvas.current = rasterCanvas;
 
       instance.addSource('meghnetra-weather-raster', {
-        type: 'canvas',
-        canvas: weatherRasterCanvas,
+        type: 'image',
+        url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
         coordinates: [
           [67.5, 37],
           [98, 37],
           [98, 7],
           [67.5, 7],
         ],
-        animate: false,
       });
 
       instance.addSource('meghnetra-events', {
@@ -483,25 +484,28 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       });
 
       const refreshWeatherRaster = () => {
-        const source = instance.getSource('meghnetra-weather-raster') as mapboxgl.CanvasSource | undefined;
-        if (!source) return;
+        const source = instance.getSource('meghnetra-weather-raster') as mapboxgl.ImageSource | undefined;
+        const canvas = weatherRasterCanvas.current;
+        if (!source || !canvas) return;
 
         const bounds = clampBounds(instance.getBounds() ?? undefined);
         renderWeatherRaster(
-          weatherRasterCanvas,
+          canvas,
           bounds,
           eventsRef.current,
           layerRef.current,
           instance.getZoom(),
         );
 
-        source.setCoordinates([
-          [bounds.west, bounds.north],
-          [bounds.east, bounds.north],
-          [bounds.east, bounds.south],
-          [bounds.west, bounds.south],
-        ]);
-        instance.triggerRepaint();
+        source.updateImage({
+          url: canvas.toDataURL('image/png'),
+          coordinates: [
+            [bounds.west, bounds.north],
+            [bounds.east, bounds.north],
+            [bounds.east, bounds.south],
+            [bounds.west, bounds.south],
+          ],
+        });
       };
 
       let refreshTimer: number | undefined;
@@ -518,6 +522,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
 
       instance.once('remove', () => {
         window.clearTimeout(refreshTimer);
+        weatherRasterCanvas.current = null;
         instance.off('zoom', scheduleRefresh);
         instance.off('move', scheduleRefresh);
         instance.off('zoomend', scheduleRefresh);
@@ -588,19 +593,21 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
     if (!instance) return;
 
     layerRef.current = layer;
-    const source = instance.getSource('meghnetra-weather-raster') as mapboxgl.CanvasSource | undefined;
-    if (!source) return;
+    const source = instance.getSource('meghnetra-weather-raster') as mapboxgl.ImageSource | undefined;
+    const canvas = weatherRasterCanvas.current;
+    if (!source || !canvas) return;
 
-    const canvas = source.getCanvas();
     const bounds = clampBounds(instance.getBounds() ?? undefined);
     renderWeatherRaster(canvas, bounds, eventsRef.current, layer, instance.getZoom());
-    source.setCoordinates([
-      [bounds.west, bounds.north],
-      [bounds.east, bounds.north],
-      [bounds.east, bounds.south],
-      [bounds.west, bounds.south],
-    ]);
-    instance.triggerRepaint();
+    source.updateImage({
+      url: canvas.toDataURL('image/png'),
+      coordinates: [
+        [bounds.west, bounds.north],
+        [bounds.east, bounds.north],
+        [bounds.east, bounds.south],
+        [bounds.west, bounds.south],
+      ],
+    });
   }, [layer]);
 
   useEffect(() => {
