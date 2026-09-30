@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { WeatherEvent } from '@/lib/demo-data';
@@ -42,22 +42,19 @@ const layerConfig = {
   visibility: { field: 'visibility', min: 1, max: 12, unit: 'km', label: 'VISIBILITY' },
 } as const;
 
-type FieldPoint = {
-  type: 'Feature';
-  geometry: { type: 'Point'; coordinates: [number, number] };
-  properties: {
-    rain: number;
-    temp: number;
-    humidity: number;
-    wind: number;
-    cloud: number;
-    visibility: number;
-    direction: number;
-  };
+type WeatherSample = {
+  rain: number;
+  temp: number;
+  humidity: number;
+  wind: number;
+  cloud: number;
+  visibility: number;
+  direction: number;
 };
 
-// Simplified India outer boundary used only to keep the synthetic weather field
-// inside India. The basemap remains Mapbox; this polygon is not a political boundary source.
+// Simplified India field boundary used only for the demo raster mask.
+// Production weather data will arrive as a provider-backed raster/grid and use
+// the same renderer, so the visual contract does not change.
 const INDIA_FIELD_BOUNDARY: [number, number][] = [
   [68.0, 23.8], [68.8, 22.0], [70.0, 20.8], [71.4, 20.0], [72.6, 18.5],
   [73.6, 16.2], [74.2, 14.2], [75.1, 11.8], [76.3, 9.0], [77.4, 8.0],
@@ -81,82 +78,157 @@ function pointInIndia(lng: number, lat: number) {
   return inside;
 }
 
-function gridSpacing(zoom: number, latitude = 22) {
-  // Keep samples roughly 38–46 screen pixels apart at every zoom level.
-  // This prevents the heatmap from turning into visible dots when drilling into a state/city.
-  const worldPx = 512 * Math.pow(2, zoom);
-  const degreesPerPixel = 360 / worldPx;
-  const lonSpacing = degreesPerPixel * 42;
-  const latSpacing = lonSpacing;
-  const latitudeCorrection = Math.max(0.55, Math.cos((latitude * Math.PI) / 180));
-  return {
-    lng: Math.max(0.0045, Math.min(0.55, lonSpacing)),
-    lat: Math.max(0.0045, Math.min(0.55, latSpacing / latitudeCorrection)),
-  };
-}
-
 function clampBounds(bounds?: mapboxgl.LngLatBounds) {
   if (!bounds) return { west: 68, south: 8, east: 97, north: 37 };
   const b = bounds;
   return {
-    west: Math.max(67.5, b.getWest() - 0.15),
-    south: Math.max(7, b.getSouth() - 0.15),
-    east: Math.min(98, b.getEast() + 0.15),
-    north: Math.min(37, b.getNorth() + 0.15),
+    west: Math.max(67.5, b.getWest() - 0.08),
+    south: Math.max(7, b.getSouth() - 0.08),
+    east: Math.min(98, b.getEast() + 0.08),
+    north: Math.min(37, b.getNorth() + 0.08),
   };
 }
 
-function buildWeatherField(events: WeatherEvent[], zoom = 5.35, bounds?: mapboxgl.LngLatBounds): FieldPoint[] {
-  const { west, south, east, north } = clampBounds(bounds);
-  const centerLat = (south + north) / 2;
-  const spacing = gridSpacing(zoom, centerLat);
-  const points: FieldPoint[] = [];
+function sampleWeather(lng: number, lat: number, events: WeatherEvent[]): WeatherSample {
+  // Smooth low-amplitude background: this deliberately avoids a saturated
+  // national-wide color so the event field is spatially meaningful.
+  let rain = 0.35 + 0.55 * (0.5 + 0.5 * Math.sin((lng - 70) / 5.4 + Math.sin(lat / 7)));
+  let temp = 32 - (lat - 8) * 0.38 + 1.5 * Math.sin(lng / 7);
+  let humidity = 57 + 14 * Math.sin((lng + lat) / 8.5);
+  let wind = 8 + 3.5 * Math.sin((lng - 70) / 4.8) + 2 * Math.cos(lat / 5.5);
+  let direction = 55 + 34 * Math.sin((lng + lat) / 9.5);
 
-  for (let lat = south; lat <= north; lat += spacing.lat) {
-    for (let lng = west; lng <= east; lng += spacing.lng) {
-      // Never render weather intensity outside India's field boundary.
-      if (!pointInIndia(lng, lat)) continue;
+  events.forEach(event => {
+    const [eLng, eLat] = coords[event.city] ?? [78.9629, 20.5937];
+    const dx = (lng - eLng) * Math.cos((lat * Math.PI) / 180);
+    const dy = lat - eLat;
+    // Localized Gaussian influence. Unlike the previous heatmap-density
+    // renderer, this changes the actual weather value, not point density.
+    const influence = Math.exp(-(dx * dx + dy * dy) / 1.8);
 
-      // Smooth deterministic demo background. In production this is replaced by
-      // provider-adapted gridded observations/model fields without changing the renderer.
-      let rain = 0.7 + 0.65 * (0.5 + 0.5 * Math.sin((lng - 71) / 4.8 + Math.sin(lat / 6)));
-      let temp = 32 - (lat - 8) * 0.38;
-      let humidity = 58 + 15 * Math.sin((lng + lat) / 8);
-      let wind = 9 + 4 * Math.sin((lng - 70) / 4) + 2.5 * Math.cos(lat / 5);
-      let direction = 55 + 34 * Math.sin((lng + lat) / 9);
+    rain += Math.max(0, event.rain) * influence;
+    temp += (event.temp - 30) * influence * 0.72;
+    humidity += (event.humidity - 65) * influence * 0.62;
+    wind += (windByCity[event.city]?.speed ?? 12) * influence * 0.18;
+    direction =
+      (direction + (windByCity[event.city]?.direction ?? 90) * influence * 0.5) /
+      (1 + influence * 0.5);
+  });
 
-      events.forEach(event => {
-        const [eLng, eLat] = coords[event.city] ?? [78.9629, 20.5937];
-        const dx = (lng - eLng) * Math.cos((lat * Math.PI) / 180);
-        const dy = lat - eLat;
-        // Tighter, weather-cell-like influence prevents one event from painting Pakistan/Iran/etc.
-        const influence = Math.exp(-(dx * dx + dy * dy) / 4.5);
-        rain += Math.max(0, event.rain) * influence;
-        temp += (event.temp - 30) * influence * 0.7;
-        humidity += (event.humidity - 65) * influence * 0.55;
-        wind += (windByCity[event.city]?.speed ?? 12) * influence * 0.16;
-        direction =
-          (direction + (windByCity[event.city]?.direction ?? 90) * influence * 0.5) /
-          (1 + influence * 0.5);
-      });
+  return {
+    rain: Math.min(10, Math.max(0, rain)),
+    temp: Math.min(45, Math.max(10, temp)),
+    humidity: Math.min(100, Math.max(0, humidity)),
+    wind: Math.min(40, Math.max(2, wind)),
+    cloud: Math.min(100, Math.max(5, humidity + 6)),
+    visibility: Math.min(12, Math.max(1, 13 - rain * 0.75)),
+    direction: (direction + 360) % 360,
+  };
+}
 
-      points.push({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [lng, lat] },
-        properties: {
-          rain: Math.min(10, Math.max(0, rain)),
-          temp: Math.min(45, Math.max(10, temp)),
-          humidity: Math.min(100, Math.max(0, humidity)),
-          wind: Math.min(40, Math.max(2, wind)),
-          cloud: Math.min(100, Math.max(5, humidity + 6)),
-          visibility: Math.min(12, Math.max(1, 13 - rain * 0.75)),
-          direction: (direction + 360) % 360,
-        },
-      });
+function rasterSize(zoom: number) {
+  if (zoom < 6) return 280;
+  if (zoom < 9) return 336;
+  if (zoom < 12) return 384;
+  if (zoom < 15) return 448;
+  return 512;
+}
+
+function mercatorY(lat: number) {
+  const rad = (lat * Math.PI) / 180;
+  return 0.5 - Math.log((1 + Math.sin(rad)) / (1 - Math.sin(rad))) / (4 * Math.PI);
+}
+
+function latitudeFromMercator(y: number) {
+  return (Math.atan(Math.sinh((0.5 - y) * 2 * Math.PI)) * 180) / Math.PI;
+}
+
+function interpolateColor(
+  value: number,
+  config: (typeof layerConfig)[keyof typeof layerConfig],
+) {
+  const normalized = Math.max(0, Math.min(1, (value - config.min) / (config.max - config.min)));
+  const stops = [
+    [0.00, [36, 105, 255]],
+    [0.22, [34, 198, 255]],
+    [0.43, [44, 225, 177]],
+    [0.62, [231, 235, 86]],
+    [0.78, [255, 175, 63]],
+    [0.91, [255, 91, 70]],
+    [1.00, [255, 48, 101]],
+  ] as const;
+
+  let left = stops[0];
+  let right = stops[stops.length - 1];
+  for (let i = 1; i < stops.length; i++) {
+    if (normalized <= stops[i][0]) {
+      left = stops[i - 1];
+      right = stops[i];
+      break;
     }
   }
 
-  return points;
+  const span = Math.max(0.0001, right[0] - left[0]);
+  const t = (normalized - left[0]) / span;
+  const eased = t * t * (3 - 2 * t);
+  const rgb = left[1].map((channel, index) => Math.round(channel + (right[1][index] - channel) * eased));
+
+  // Keep weak/background values atmospheric and let stronger values carry the
+  // visual signal. This is intentionally much softer than the old density map.
+  const alpha = normalized < 0.04
+    ? 0
+    : Math.min(0.66, 0.055 + Math.pow(normalized, 1.35) * 0.64);
+
+  return [rgb[0], rgb[1], rgb[2], Math.round(alpha * 255)] as const;
+}
+
+function renderWeatherRaster(
+  canvas: HTMLCanvasElement,
+  bounds: { west: number; south: number; east: number; north: number },
+  events: WeatherEvent[],
+  layer: keyof typeof layerConfig,
+  zoom: number,
+) {
+  const size = rasterSize(zoom);
+  canvas.width = size;
+  canvas.height = size;
+
+  const ctx = canvas.getContext('2d', { willReadFrequently: false });
+  if (!ctx) return;
+
+  const image = ctx.createImageData(size, size);
+  const data = image.data;
+  const config = layerConfig[layer];
+  const northY = mercatorY(bounds.north);
+  const southY = mercatorY(bounds.south);
+
+  for (let py = 0; py < size; py++) {
+    const y = py / Math.max(1, size - 1);
+    const mercator = northY + (southY - northY) * y;
+    const lat = latitudeFromMercator(mercator);
+
+    for (let px = 0; px < size; px++) {
+      const x = px / Math.max(1, size - 1);
+      const lng = bounds.west + (bounds.east - bounds.west) * x;
+      const index = (py * size + px) * 4;
+
+      if (!pointInIndia(lng, lat)) {
+        data[index + 3] = 0;
+        continue;
+      }
+
+      const sample = sampleWeather(lng, lat, events);
+      const value = sample[config.field as keyof WeatherSample] as number;
+      const [r, g, b, a] = interpolateColor(value, config);
+
+      data[index] = r;
+      data[index + 1] = g;
+      data[index + 2] = b;
+      data[index + 3] = a;
+    }
+  }
+
+  ctx.putImageData(image, 0, 0);
 }
 
 function windFor(event: WeatherEvent) {
@@ -205,8 +277,9 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
   const eventsRef = useRef(events);
   eventsRef.current = events;
 
-  const initialField = useMemo(() => buildWeatherField(events, 5.35), [events]);
   const selectedWind = windFor(selected);
+  const layerRef = useRef(layer);
+  layerRef.current = layer;
 
   useEffect(() => {
     if (!container.current || !token) return;
@@ -256,9 +329,19 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
         url: 'mapbox://mapbox.country-boundaries-v1',
       });
 
-      instance.addSource('meghnetra-field', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: initialField },
+      const weatherRasterCanvas = document.createElement('canvas');
+      weatherRasterCanvas.setAttribute('aria-hidden', 'true');
+
+      instance.addSource('meghnetra-weather-raster', {
+        type: 'canvas',
+        canvas: weatherRasterCanvas,
+        coordinates: [
+          [67.5, 37],
+          [98, 37],
+          [98, 7],
+          [67.5, 7],
+        ],
+        animate: false,
       });
 
       instance.addSource('meghnetra-events', {
@@ -328,29 +411,15 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       });
 
       instance.addLayer({
-        id: 'meghnetra-weather-field',
-        type: 'heatmap',
-        source: 'meghnetra-field',
+        id: 'meghnetra-weather-raster',
+        type: 'raster',
+        source: 'meghnetra-weather-raster',
         slot: 'bottom',
-        maxzoom: 22,
         paint: {
-          'heatmap-weight': ['interpolate', ['linear'], ['get', 'rain'], 0, 0.03, 10, 1],
-          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3, 0.52, 7, 0.62, 11, 0.72, 15, 0.82, 18, 0.9],
-          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3, 92, 6, 86, 9, 82, 12, 78, 15, 74, 18, 70],
-          'heatmap-opacity': 0.52,
-          'heatmap-color': [
-            'interpolate',
-            ['linear'],
-            ['heatmap-density'],
-            0, 'rgba(0,70,255,0)',
-            0.16, '#164fff',
-            0.34, '#00b9ff',
-            0.52, '#21e0b1',
-            0.68, '#e8ed55',
-            0.82, '#ffad3d',
-            0.93, '#ff5c48',
-            1, '#ff2e68',
-          ],
+          'raster-opacity': 0.58,
+          'raster-fade-duration': 0,
+          'raster-resampling': 'linear',
+          'raster-emissive-strength': 0.28,
         },
       });
 
@@ -413,28 +482,44 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
         },
       });
 
-      const refreshField = () => {
-        const source = instance.getSource('meghnetra-field') as mapboxgl.GeoJSONSource | undefined;
+      const refreshWeatherRaster = () => {
+        const source = instance.getSource('meghnetra-weather-raster') as mapboxgl.CanvasSource | undefined;
         if (!source) return;
-        const zoom = instance.getZoom();
-        source.setData({
-          type: 'FeatureCollection',
-          features: buildWeatherField(eventsRef.current, zoom, instance.getBounds() ?? undefined),
-        });
+
+        const bounds = clampBounds(instance.getBounds() ?? undefined);
+        renderWeatherRaster(
+          weatherRasterCanvas,
+          bounds,
+          eventsRef.current,
+          layerRef.current,
+          instance.getZoom(),
+        );
+
+        source.setCoordinates([
+          [bounds.west, bounds.north],
+          [bounds.east, bounds.north],
+          [bounds.east, bounds.south],
+          [bounds.west, bounds.south],
+        ]);
+        instance.triggerRepaint();
       };
 
       let refreshTimer: number | undefined;
       const scheduleRefresh = () => {
         window.clearTimeout(refreshTimer);
-        refreshTimer = window.setTimeout(refreshField, 110);
+        refreshTimer = window.setTimeout(refreshWeatherRaster, 90);
       };
 
+      instance.on('zoom', scheduleRefresh);
+      instance.on('move', scheduleRefresh);
       instance.on('zoomend', scheduleRefresh);
       instance.on('moveend', scheduleRefresh);
-      refreshField();
+      refreshWeatherRaster();
 
       instance.once('remove', () => {
         window.clearTimeout(refreshTimer);
+        instance.off('zoom', scheduleRefresh);
+        instance.off('move', scheduleRefresh);
         instance.off('zoomend', scheduleRefresh);
         instance.off('moveend', scheduleRefresh);
       });
@@ -455,7 +540,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       instance.remove();
       map.current = null;
     };
-  }, [events, initialField, onSelect]);
+  }, [events, onSelect]);
 
   useEffect(() => {
     const instance = map.current;
@@ -502,15 +587,20 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
     const instance = map.current;
     if (!instance) return;
 
-    const source = instance.getSource('meghnetra-field') as mapboxgl.GeoJSONSource | undefined;
+    layerRef.current = layer;
+    const source = instance.getSource('meghnetra-weather-raster') as mapboxgl.CanvasSource | undefined;
     if (!source) return;
 
-    const config = layerConfig[layer];
-    instance.setPaintProperty(
-      'meghnetra-weather-field',
-      'heatmap-weight',
-      ['interpolate', ['linear'], ['get', config.field], config.min, 0, config.max, 1],
-    );
+    const canvas = source.getCanvas();
+    const bounds = clampBounds(instance.getBounds() ?? undefined);
+    renderWeatherRaster(canvas, bounds, eventsRef.current, layer, instance.getZoom());
+    source.setCoordinates([
+      [bounds.west, bounds.north],
+      [bounds.east, bounds.north],
+      [bounds.east, bounds.south],
+      [bounds.west, bounds.south],
+    ]);
+    instance.triggerRepaint();
   }, [layer]);
 
   useEffect(() => {
