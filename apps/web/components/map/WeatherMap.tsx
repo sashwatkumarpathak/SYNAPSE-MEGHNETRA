@@ -70,9 +70,23 @@ export function WeatherMap({selected,setSelected}:{selected:WeatherEvent,setSele
         </div>
         <div className="weather-scale-bar"/>
         <div className="weather-scale-values">
-          <span>{formatScaleValue(dynamicDomain.min, layer)}</span>
-          <span>{formatScaleValue(dynamicMid, layer)}</span>
-          <span>{formatScaleValue(dynamicDomain.max, layer)}</span>
+          {layer === 'temperature' ? (
+            <>
+              <span>-20°</span>
+              <span>-10°</span>
+              <span>0°</span>
+              <span>10°</span>
+              <span>20°</span>
+              <span>30°</span>
+              <span>40°</span>
+            </>
+          ) : (
+            <>
+              <span>{formatScaleValue(dynamicDomain.min, layer)}</span>
+              <span>{formatScaleValue(dynamicMid, layer)}</span>
+              <span>{formatScaleValue(dynamicDomain.max, layer)}</span>
+            </>
+          )}
         </div>
       </div>
 
