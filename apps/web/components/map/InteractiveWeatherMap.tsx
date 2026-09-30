@@ -127,11 +127,12 @@ function sampleWeather(lng: number, lat: number, events: WeatherEvent[]): Weathe
 }
 
 function rasterSize(zoom: number) {
-  if (zoom < 6) return 280;
-  if (zoom < 9) return 336;
-  if (zoom < 12) return 384;
-  if (zoom < 15) return 448;
-  return 512;
+  // The field is regenerated only after map interactions settle. Keeping the
+  // texture compact prevents CPU spikes while Mapbox handles smooth camera motion.
+  if (zoom < 7) return 208;
+  if (zoom < 11) return 224;
+  if (zoom < 15) return 240;
+  return 256;
 }
 
 function mercatorY(lat: number) {
@@ -143,20 +144,47 @@ function latitudeFromMercator(y: number) {
   return (Math.atan(Math.sinh((0.5 - y) * 2 * Math.PI)) * 180) / Math.PI;
 }
 
+type ColorStop = readonly [number, readonly [number, number, number]];
+
+const FIELD_COLOR_STOPS: Record<keyof typeof layerConfig, readonly ColorStop[]> = {
+  rainfall: [
+    [0.00, [18, 78, 116]], [0.08, [49, 151, 213]], [0.20, [43, 199, 224]],
+    [0.38, [47, 205, 111]], [0.56, [225, 224, 65]], [0.74, [255, 170, 49]],
+    [0.88, [246, 74, 48]], [1.00, [190, 31, 76]],
+  ],
+  temperature: [
+    [0.00, [41, 82, 183]], [0.18, [41, 151, 224]], [0.36, [49, 204, 197]],
+    [0.52, [130, 220, 125]], [0.66, [239, 224, 76]], [0.80, [255, 163, 52]],
+    [0.92, [238, 74, 52]], [1.00, [157, 38, 78]],
+  ],
+  wind: [
+    [0.00, [34, 91, 171]], [0.20, [35, 151, 220]], [0.42, [51, 205, 211]],
+    [0.62, [69, 214, 135]], [0.78, [215, 220, 74]], [0.90, [255, 162, 49]],
+    [1.00, [238, 67, 61]],
+  ],
+  humidity: [
+    [0.00, [194, 101, 55]], [0.18, [204, 137, 63]], [0.38, [169, 188, 79]],
+    [0.55, [74, 190, 112]], [0.72, [44, 190, 181]], [0.86, [48, 151, 207]],
+    [1.00, [47, 82, 163]],
+  ],
+  cloud: [
+    [0.00, [17, 28, 39]], [0.30, [54, 76, 91]], [0.52, [112, 135, 146]],
+    [0.72, [190, 202, 204]], [0.88, [228, 235, 234]], [1.00, [255, 255, 255]],
+  ],
+  visibility: [
+    [0.00, [184, 48, 91]], [0.18, [224, 73, 87]], [0.38, [231, 142, 66]],
+    [0.56, [193, 206, 91]], [0.72, [71, 190, 112]], [0.86, [55, 176, 207]],
+    [1.00, [47, 91, 160]],
+  ],
+};
+
 function interpolateColor(
   value: number,
   config: (typeof layerConfig)[keyof typeof layerConfig],
+  layer: keyof typeof layerConfig,
 ) {
   const normalized = Math.max(0, Math.min(1, (value - config.min) / (config.max - config.min)));
-  const stops: ReadonlyArray<readonly [number, readonly [number, number, number]]> = [
-    [0.00, [36, 105, 255]],
-    [0.22, [34, 198, 255]],
-    [0.43, [44, 225, 177]],
-    [0.62, [231, 235, 86]],
-    [0.78, [255, 175, 63]],
-    [0.91, [255, 91, 70]],
-    [1.00, [255, 48, 101]],
-  ];
+  const stops = FIELD_COLOR_STOPS[layer];
 
   let left = stops[0];
   let right = stops[stops.length - 1];
@@ -171,13 +199,32 @@ function interpolateColor(
   const span = Math.max(0.0001, right[0] - left[0]);
   const t = (normalized - left[0]) / span;
   const eased = t * t * (3 - 2 * t);
-  const rgb = left[1].map((channel, index) => Math.round(channel + (right[1][index] - channel) * eased));
+  const rgb = left[1].map((channel, index) =>
+    Math.round(channel + (right[1][index] - channel) * eased),
+  );
 
-  // Keep weak/background values atmospheric and let stronger values carry the
-  // visual signal. This is intentionally much softer than the old density map.
-  const alpha = normalized < 0.04
+  // Weather layers should read as transparent atmospheric fields, not solid paint.
+  // Precipitation is intentionally sparse; temperature/humidity can carry more base field.
+  const opacityBase =
+    layer === 'rainfall' ? 0.00 :
+    layer === 'temperature' ? 0.10 :
+    layer === 'wind' ? 0.11 :
+    layer === 'humidity' ? 0.08 :
+    layer === 'cloud' ? 0.05 : 0.08;
+  const opacityGain =
+    layer === 'rainfall' ? 0.72 :
+    layer === 'temperature' ? 0.42 :
+    layer === 'wind' ? 0.40 :
+    layer === 'humidity' ? 0.44 :
+    layer === 'cloud' ? 0.52 : 0.46;
+
+  const threshold =
+    layer === 'rainfall' ? 0.07 :
+    layer === 'temperature' ? 0.02 : 0.03;
+
+  const alpha = normalized < threshold
     ? 0
-    : Math.min(0.66, 0.055 + Math.pow(normalized, 1.35) * 0.64);
+    : Math.min(0.64, opacityBase + Math.pow((normalized - threshold) / (1 - threshold), 1.45) * opacityGain);
 
   return [rgb[0], rgb[1], rgb[2], Math.round(alpha * 255)] as const;
 }
@@ -219,7 +266,7 @@ function renderWeatherRaster(
 
       const sample = sampleWeather(lng, lat, events);
       const value = sample[config.field as keyof WeatherSample] as number;
-      const [r, g, b, a] = interpolateColor(value, config);
+      const [r, g, b, a] = interpolateColor(value, config, layer);
 
       data[index] = r;
       data[index + 1] = g;
@@ -260,13 +307,13 @@ function windVector(lng: number, lat: number, events: WeatherEvent[]) {
 }
 
 function particleCount(zoom: number) {
-  if (zoom < 5.5) return 55;
-  if (zoom < 7) return 80;
-  if (zoom < 8.5) return 110;
-  if (zoom < 10) return 145;
-  if (zoom < 11.5) return 190;
-  if (zoom < 13) return 250;
-  return 320;
+  if (zoom < 5.5) return 45;
+  if (zoom < 7) return 60;
+  if (zoom < 8.5) return 78;
+  if (zoom < 10) return 96;
+  if (zoom < 12) return 118;
+  if (zoom < 14) return 140;
+  return 165;
 }
 
 export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect }: Props) {
@@ -511,22 +558,20 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       let refreshTimer: number | undefined;
       const scheduleRefresh = () => {
         window.clearTimeout(refreshTimer);
-        refreshTimer = window.setTimeout(refreshWeatherRaster, 90);
+        refreshTimer = window.setTimeout(refreshWeatherRaster, 220);
       };
 
-      instance.on('zoom', scheduleRefresh);
-      instance.on('move', scheduleRefresh);
       instance.on('zoomend', scheduleRefresh);
       instance.on('moveend', scheduleRefresh);
+      instance.on('resize', scheduleRefresh);
       refreshWeatherRaster();
 
       instance.once('remove', () => {
         window.clearTimeout(refreshTimer);
         weatherRasterCanvas.current = null;
-        instance.off('zoom', scheduleRefresh);
-        instance.off('move', scheduleRefresh);
         instance.off('zoomend', scheduleRefresh);
         instance.off('moveend', scheduleRefresh);
+        instance.off('resize', scheduleRefresh);
       });
     });
 
@@ -618,6 +663,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
     let frame = 0;
     let running = true;
     let lastTime = 0;
+    let lastDraw = 0;
     let particles: Array<{ lng: number; lat: number; age: number; life: number; seed: number }> = [];
 
     const hash = (n: number) => {
@@ -655,6 +701,14 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
 
     const draw = (time: number) => {
       if (!running) return;
+
+      // Cap the decorative wind layer around 30 FPS. The Mapbox renderer remains
+      // fully interactive underneath it.
+      if (time - lastDraw < 32) {
+        frame = requestAnimationFrame(draw);
+        return;
+      }
+      lastDraw = time;
 
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -698,13 +752,8 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
           const lifeFade = Math.sin(Math.min(1, particle.age) * Math.PI);
           const alpha = (0.10 + Math.min(0.22, vector.speed / 150)) * lifeFade;
 
-          const gradient = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-          gradient.addColorStop(0, 'rgba(115, 231, 255, 0)');
-          gradient.addColorStop(0.45, `rgba(115, 231, 255, ${alpha * 0.55})`);
-          gradient.addColorStop(1, `rgba(180, 244, 255, ${alpha})`);
-
-          ctx.strokeStyle = gradient;
-          ctx.lineWidth = instance.getZoom() > 11 ? 1 : 0.7;
+          ctx.strokeStyle = `rgba(155, 235, 255, ${alpha})`;
+          ctx.lineWidth = instance.getZoom() > 11 ? 1 : 0.72;
           ctx.lineCap = 'round';
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
