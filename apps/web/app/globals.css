@@ -2264,6 +2264,7 @@ button {
 .weather-scale-cloud .weather-scale-bar{
   background:linear-gradient(90deg,#111c27 0%,#364c5b 30%,#708792 52%,#becacc 73%,#e5ebea 89%,#fff 100%);
 }
+.weather-scale-wind{bottom:118px}
 .weather-scale-visibility .weather-scale-bar{
   background:linear-gradient(90deg,#b8305b 0%,#e04957 18%,#e78e42 38%,#c1ce5b 56%,#47be70 72%,#37b0cf 87%,#2f5ba0 100%);
 }
