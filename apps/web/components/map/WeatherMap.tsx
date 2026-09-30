@@ -5,19 +5,25 @@ import { useEffect, useRef, useState } from 'react';
 import { events, WeatherEvent } from '@/lib/demo-data';
 import { LayerControl, WeatherLayer } from './LayerControl';
 import { ViewModeToggle } from './ViewModeToggle';
-import { InteractiveWeatherMap } from './InteractiveWeatherMap';
+import { getDynamicLayerDomain, InteractiveWeatherMap } from './InteractiveWeatherMap';
 
 function PlusIcon(){return <span className="pm">+</span>}
 function MinusIcon(){return <span className="pm">−</span>}
 
-const layerScale: Record<WeatherLayer, { min: string; mid: string; max: string; unit: string }> = {
-  rainfall: { min: '0', mid: '5', max: '10+', unit: 'mm/h' },
-  temperature: { min: '10°', mid: '28°', max: '45°', unit: '°C' },
-  wind: { min: '0', mid: '20', max: '40+', unit: 'km/h' },
-  humidity: { min: '0', mid: '50', max: '100', unit: '%' },
-  cloud: { min: '0', mid: '50', max: '100', unit: '%' },
-  visibility: { min: '1', mid: '7', max: '12+', unit: 'km' },
+const layerUnits: Record<WeatherLayer, string> = {
+  rainfall: 'mm/h',
+  temperature: '°C',
+  wind: 'km/h',
+  humidity: '%',
+  cloud: '%',
+  visibility: 'km',
 };
+
+function formatScaleValue(value: number, layer: WeatherLayer) {
+  if (layer === 'temperature') return `${value.toFixed(1)}°`;
+  if (layer === 'rainfall' || layer === 'wind' || layer === 'visibility') return value.toFixed(1);
+  return Math.round(value).toString();
+}
 
 export function WeatherMap({selected,setSelected}:{selected:WeatherEvent,setSelected:(e:WeatherEvent)=>void}){
   const [layer,setLayer]=useState<WeatherLayer>('rainfall');
@@ -33,6 +39,8 @@ export function WeatherMap({selected,setSelected}:{selected:WeatherEvent,setSele
   }, []);
 
   const shellClass = `map-shell${expanded ? ' map-shell-expanded' : ''}${fullscreen ? ' map-shell-fullscreen' : ''}`;
+  const dynamicDomain = getDynamicLayerDomain(layer, events);
+  const dynamicMid = (dynamicDomain.min + dynamicDomain.max) / 2;
 
   const toggleFullscreen = async () => {
     const shell = shellRef.current;
@@ -57,14 +65,14 @@ export function WeatherMap({selected,setSelected}:{selected:WeatherEvent,setSele
 
       <div className={`weather-scale weather-scale-${layer}`} aria-label={`${layer} intensity scale`}>
         <div className="weather-scale-head">
-          <span>{layer.toUpperCase()} FIELD</span>
-          <b>{layerScale[layer].unit}</b>
+          <span>{layer.toUpperCase()} · INDIA RANGE</span>
+          <b>{layerUnits[layer]}</b>
         </div>
         <div className="weather-scale-bar"/>
         <div className="weather-scale-values">
-          <span>{layerScale[layer].min}</span>
-          <span>{layerScale[layer].mid}</span>
-          <span>{layerScale[layer].max}</span>
+          <span>{formatScaleValue(dynamicDomain.min, layer)}</span>
+          <span>{formatScaleValue(dynamicMid, layer)}</span>
+          <span>{formatScaleValue(dynamicDomain.max, layer)}</span>
         </div>
       </div>
 
