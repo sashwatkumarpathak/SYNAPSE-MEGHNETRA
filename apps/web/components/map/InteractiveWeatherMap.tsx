@@ -199,6 +199,8 @@ export type WeatherFieldDomain = {
   max: number;
 };
 
+const STATIC_TEMPERATURE_DOMAIN: WeatherFieldDomain = { min: -20, max: 40 };
+
 function fieldValue(sample: WeatherSample, layer: keyof typeof layerConfig) {
   return sample[layerConfig[layer].field as keyof WeatherSample] as number;
 }
@@ -207,6 +209,8 @@ export function getDynamicLayerDomain(
   layer: keyof typeof layerConfig,
   events: WeatherEvent[],
 ): WeatherFieldDomain {
+  if (layer === 'temperature') return STATIC_TEMPERATURE_DOMAIN;
+
   const values: number[] = [];
   const samplesX = 70;
   const samplesY = 60;
