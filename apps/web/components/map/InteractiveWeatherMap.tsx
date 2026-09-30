@@ -158,12 +158,23 @@ const FIELD_COLOR_STOPS: Record<keyof typeof layerConfig, readonly ColorStop[]> 
     [1.00, [164, 27, 91]],
   ],
   temperature: [
-    [0.00, [24, 65, 173]], [0.07, [21, 108, 218]], [0.14, [18, 155, 244]],
-    [0.21, [16, 195, 244]], [0.28, [19, 220, 216]], [0.35, [42, 222, 171]],
-    [0.42, [76, 224, 127]], [0.49, [126, 228, 93]], [0.56, [183, 232, 69]],
-    [0.63, [228, 227, 57]], [0.70, [250, 205, 49]], [0.77, [255, 169, 40]],
-    [0.84, [255, 125, 34]], [0.90, [247, 78, 40]], [0.96, [218, 43, 61]],
-    [1.00, [164, 27, 86]],
+    [0.00, [25, 54, 168]],   // -20
+    [0.08, [18, 91, 210]],   // -15
+    [0.17, [12, 137, 238]],  // -10
+    [0.25, [10, 181, 244]],  //  -5
+    [0.33, [12, 214, 225]],  //   0
+    [0.42, [30, 222, 179]],  //   5
+    [0.50, [73, 224, 125]],  //  10
+    [0.58, [137, 228, 75]],  //  15
+    [0.67, [215, 231, 55]],  //  20
+    [0.72, [241, 222, 43]],  //  23
+    [0.75, [255, 204, 38]],  //  25
+    [0.79, [255, 177, 35]],  //  27
+    [0.83, [255, 145, 32]],  //  30
+    [0.875, [250, 101, 36]], //  32.5
+    [0.92, [239, 62, 42]],   //  35
+    [0.96, [211, 39, 60]],   //  37.5
+    [1.00, [157, 27, 79]],   //  40
   ],
   wind: [
     [0.00, [19, 66, 166]], [0.08, [18, 112, 220]], [0.16, [17, 158, 243]],
@@ -283,20 +294,20 @@ function interpolateColor(
 
   const span = Math.max(0.0001, right[0] - left[0]);
   const t = (normalized - left[0]) / span;
-  const eased = t * t * (3 - 2 * t);
   const rgb = left[1].map((channel, index) =>
-    Math.round(channel + (right[1][index] - channel) * eased),
+    Math.round(channel + (right[1][index] - channel) * t),
   );
 
   // Keep the field visibly saturated against the dark basemap. The basemap
   // remains readable underneath, but the weather data is no longer washed out.
   const opacityBase =
-    layer === 'temperature' ? 0.76 :
+    layer === 'temperature' ? 0.90 :
     layer === 'wind' ? 0.72 :
     layer === 'humidity' ? 0.70 :
     layer === 'cloud' ? 0.62 :
     layer === 'visibility' ? 0.70 : 0.68;
   const opacityGain =
+    layer === 'temperature' ? 0.10 :
     layer === 'cloud' ? 0.26 : 0.24;
   const alpha = Math.min(0.98, opacityBase + Math.pow(normalized, 0.9) * opacityGain);
 
