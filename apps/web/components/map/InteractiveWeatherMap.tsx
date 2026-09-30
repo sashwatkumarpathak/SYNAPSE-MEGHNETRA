@@ -148,7 +148,7 @@ function interpolateColor(
   config: (typeof layerConfig)[keyof typeof layerConfig],
 ) {
   const normalized = Math.max(0, Math.min(1, (value - config.min) / (config.max - config.min)));
-  const stops = [
+  const stops: ReadonlyArray<readonly [number, readonly [number, number, number]]> = [
     [0.00, [36, 105, 255]],
     [0.22, [34, 198, 255]],
     [0.43, [44, 225, 177]],
@@ -156,7 +156,7 @@ function interpolateColor(
     [0.78, [255, 175, 63]],
     [0.91, [255, 91, 70]],
     [1.00, [255, 48, 101]],
-  ] as const;
+  ];
 
   let left = stops[0];
   let right = stops[stops.length - 1];
