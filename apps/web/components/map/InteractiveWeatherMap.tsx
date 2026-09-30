@@ -127,12 +127,12 @@ function sampleWeather(lng: number, lat: number, events: WeatherEvent[]): Weathe
 }
 
 function rasterSize(zoom: number) {
-  // The field is regenerated only after map interactions settle. Keeping the
-  // texture compact prevents CPU spikes while Mapbox handles smooth camera motion.
-  if (zoom < 7) return 208;
-  if (zoom < 11) return 224;
-  if (zoom < 15) return 240;
-  return 256;
+  // Compact texture: the map stays interactive while the weather field remains
+  // visually continuous at national, regional and street-level zooms.
+  if (zoom < 7) return 192;
+  if (zoom < 11) return 208;
+  if (zoom < 15) return 224;
+  return 240;
 }
 
 function mercatorY(lat: number) {
@@ -205,26 +205,28 @@ function interpolateColor(
 
   // Weather layers should read as transparent atmospheric fields, not solid paint.
   // Precipitation is intentionally sparse; temperature/humidity can carry more base field.
+  // The field must read clearly against the dark basemap. Keep the low end
+  // visible and reserve the brightest opacity for genuine high-intensity areas.
   const opacityBase =
-    layer === 'rainfall' ? 0.00 :
-    layer === 'temperature' ? 0.10 :
-    layer === 'wind' ? 0.11 :
-    layer === 'humidity' ? 0.08 :
-    layer === 'cloud' ? 0.05 : 0.08;
+    layer === 'rainfall' ? 0.16 :
+    layer === 'temperature' ? 0.30 :
+    layer === 'wind' ? 0.28 :
+    layer === 'humidity' ? 0.27 :
+    layer === 'cloud' ? 0.24 : 0.27;
   const opacityGain =
-    layer === 'rainfall' ? 0.72 :
-    layer === 'temperature' ? 0.42 :
-    layer === 'wind' ? 0.40 :
-    layer === 'humidity' ? 0.44 :
-    layer === 'cloud' ? 0.52 : 0.46;
+    layer === 'rainfall' ? 0.70 :
+    layer === 'temperature' ? 0.60 :
+    layer === 'wind' ? 0.62 :
+    layer === 'humidity' ? 0.62 :
+    layer === 'cloud' ? 0.68 : 0.64;
 
   const threshold =
-    layer === 'rainfall' ? 0.07 :
-    layer === 'temperature' ? 0.02 : 0.03;
+    layer === 'rainfall' ? 0.025 :
+    layer === 'temperature' ? 0.00 : 0.01;
 
   const alpha = normalized < threshold
     ? 0
-    : Math.min(0.64, opacityBase + Math.pow((normalized - threshold) / (1 - threshold), 1.45) * opacityGain);
+    : Math.min(0.92, opacityBase + Math.pow((normalized - threshold) / Math.max(0.001, 1 - threshold), 1.12) * opacityGain);
 
   return [rgb[0], rgb[1], rgb[2], Math.round(alpha * 255)] as const;
 }
@@ -325,7 +327,6 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
   const eventsRef = useRef(events);
   eventsRef.current = events;
 
-  const selectedWind = windFor(selected);
   const layerRef = useRef(layer);
   layerRef.current = layer;
 
@@ -382,8 +383,9 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       weatherRasterCanvas.current = rasterCanvas;
 
       instance.addSource('meghnetra-weather-raster', {
-        type: 'image',
-        url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        type: 'canvas',
+        canvas: rasterCanvas,
+        animate: false,
         coordinates: [
           [67.5, 37],
           [98, 37],
@@ -462,12 +464,14 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
         id: 'meghnetra-weather-raster',
         type: 'raster',
         source: 'meghnetra-weather-raster',
-        slot: 'bottom',
+        // Middle places the weather field above the dark land paint but below
+        // the India outline, event markers and labels.
+        slot: 'middle',
         paint: {
-          'raster-opacity': 0.58,
+          'raster-opacity': 0.92,
           'raster-fade-duration': 0,
           'raster-resampling': 'linear',
-          'raster-emissive-strength': 0.28,
+          'raster-emissive-strength': 0.62,
         },
       });
 
@@ -531,7 +535,9 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
       });
 
       const refreshWeatherRaster = () => {
-        const source = instance.getSource('meghnetra-weather-raster') as mapboxgl.ImageSource | undefined;
+        const source = instance.getSource('meghnetra-weather-raster') as
+          | { setCoordinates: (coordinates: [number, number][]) => void; play: () => void; pause: () => void }
+          | undefined;
         const canvas = weatherRasterCanvas.current;
         if (!source || !canvas) return;
 
@@ -544,15 +550,17 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
           instance.getZoom(),
         );
 
-        source.updateImage({
-          url: canvas.toDataURL('image/png'),
-          coordinates: [
-            [bounds.west, bounds.north],
-            [bounds.east, bounds.north],
-            [bounds.east, bounds.south],
-            [bounds.west, bounds.south],
-          ],
-        });
+        source.setCoordinates([
+          [bounds.west, bounds.north],
+          [bounds.east, bounds.north],
+          [bounds.east, bounds.south],
+          [bounds.west, bounds.south],
+        ]);
+
+        // CanvasSource is static for performance. Briefly enable one repaint so
+        // Mapbox uploads the newly rendered canvas, then immediately pause it.
+        source.play();
+        window.requestAnimationFrame(() => source.pause());
       };
 
       let refreshTimer: number | undefined;
@@ -644,21 +652,22 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
     if (!instance) return;
 
     layerRef.current = layer;
-    const source = instance.getSource('meghnetra-weather-raster') as mapboxgl.ImageSource | undefined;
+    const source = instance.getSource('meghnetra-weather-raster') as
+      | { setCoordinates: (coordinates: [number, number][]) => void; play: () => void; pause: () => void }
+      | undefined;
     const canvas = weatherRasterCanvas.current;
     if (!source || !canvas) return;
 
     const bounds = clampBounds(instance.getBounds() ?? undefined);
     renderWeatherRaster(canvas, bounds, eventsRef.current, layer, instance.getZoom());
-    source.updateImage({
-      url: canvas.toDataURL('image/png'),
-      coordinates: [
-        [bounds.west, bounds.north],
-        [bounds.east, bounds.north],
-        [bounds.east, bounds.south],
-        [bounds.west, bounds.south],
-      ],
-    });
+    source.setCoordinates([
+      [bounds.west, bounds.north],
+      [bounds.east, bounds.north],
+      [bounds.east, bounds.south],
+      [bounds.west, bounds.south],
+    ]);
+    source.play();
+    window.requestAnimationFrame(() => source.pause());
   }, [layer]);
 
   useEffect(() => {
@@ -801,34 +810,7 @@ export function InteractiveWeatherMap({ events, selected, mode, layer, onSelect 
         </div>
       )}
 
-      <div className="map-layer-badge">
-        <span>{layerConfig[layer].label}</span>
-        <b>{layerConfig[layer].unit}</b>
-      </div>
 
-      <div className="map-data-strip"><span className="map-view-state">{mode === '3D' ? '● TRUE 3D TERRAIN + CITY BUILDINGS' : '● 2D WEATHER FIELD'}</span>
-        <span><i className="live-dot" /> DEMO WEATHER FIELD</span>
-        <span>06:00–13:30 IST</span>
-        <span>{mode === '3D' ? '3D TERRAIN + CITY MODEL' : 'NATIONAL 2D FIELD'}</span>
-      </div>
-
-      {layer === 'wind' && (
-        <div className="wind-intel-card">
-          <div className="wind-intel-head">
-            <span>WIND FIELD</span>
-            <b>10 m AGL</b>
-          </div>
-          <strong>{selectedWind.speed.toFixed(1)} <small>km/h</small></strong>
-          <div className="wind-direction">
-            <span style={{ transform: `rotate(${selectedWind.direction}deg)` }}>↑</span>
-            <div>
-              <b>{selectedWind.cardinal}</b>
-              <small>{selectedWind.direction}° · gust {selectedWind.gust.toFixed(1)} km/h</small>
-            </div>
-          </div>
-          <em>Flow density increases continuously with zoom.</em>
-        </div>
-      )}
     </div>
   );
 }
