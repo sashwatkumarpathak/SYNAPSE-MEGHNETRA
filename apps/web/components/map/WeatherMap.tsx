@@ -1,7 +1,7 @@
 'use client';
 
 import { Crosshair, Expand, Maximize2, Minimize2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { events, WeatherEvent } from '@/lib/demo-data';
 import { LayerControl, WeatherLayer } from './LayerControl';
 import { ViewModeToggle } from './ViewModeToggle';
@@ -15,10 +15,18 @@ export function WeatherMap({selected,setSelected}:{selected:WeatherEvent,setSele
   const [mode,setMode]=useState<'2D'|'3D'>('2D');
   const [expanded,setExpanded]=useState(false);
   const [fullscreen,setFullscreen]=useState(false);
+  const shellRef=useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
   const shellClass = `map-shell${expanded ? ' map-shell-expanded' : ''}${fullscreen ? ' map-shell-fullscreen' : ''}`;
 
   const toggleFullscreen = async () => {
-    const shell = document.querySelector('.map-shell');
+    const shell = shellRef.current;
     if (!shell) return;
     try {
       if (!document.fullscreenElement) {
@@ -33,10 +41,7 @@ export function WeatherMap({selected,setSelected}:{selected:WeatherEvent,setSele
   };
 
   if (process.env.NEXT_PUBLIC_MAPBOX_TOKEN) {
-    return <div
-      className={shellClass}
-      onFullscreenChange={() => setFullscreen(Boolean(document.fullscreenElement))}
-    >
+    return <div ref={shellRef} className={shellClass}>
       <InteractiveWeatherMap events={events} selected={selected} mode={mode} layer={layer} onSelect={setSelected}/>
       <LayerControl value={layer} onChange={setLayer}/>
       <ViewModeToggle mode={mode} onChange={setMode}/>
