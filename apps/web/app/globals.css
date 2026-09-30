@@ -2206,3 +2206,83 @@ button {
     right:96px;
   }
 }
+
+
+/* Layer-aware field scale — keeps the meaning of each weather surface visible. */
+.weather-scale{
+  position:absolute;
+  right:17px;
+  bottom:58px;
+  z-index:7;
+  width:190px;
+  padding:9px 10px 8px;
+  border:1px solid rgba(112,178,218,.14);
+  border-radius:9px;
+  background:rgba(2,10,17,.76);
+  backdrop-filter:blur(13px) saturate(125%);
+  box-shadow:0 10px 30px rgba(0,0,0,.25);
+}
+.weather-scale-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  color:#7393a8;
+  font-size:7px;
+  letter-spacing:.1em;
+}
+.weather-scale-head b{
+  color:#bcefff;
+  font-size:7px;
+  letter-spacing:.04em;
+}
+.weather-scale-bar{
+  height:7px;
+  margin-top:7px;
+  border-radius:999px;
+  background:linear-gradient(90deg,#2469ff 0%,#22c6ff 20%,#35df9a 42%,#e7eb56 60%,#ffaf3f 77%,#ff5b46 91%,#be1f4c 100%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
+}
+.weather-scale-values{
+  display:flex;
+  justify-content:space-between;
+  margin-top:5px;
+  color:#5e7b90;
+  font-size:7px;
+}
+.weather-scale-rainfall .weather-scale-bar{
+  background:linear-gradient(90deg,#173e5d 0%,#3197d5 12%,#2bc7e0 28%,#2fcd6f 48%,#e1e041 66%,#ffaa31 79%,#f64a30 91%,#be1f4c 100%);
+}
+.weather-scale-temperature .weather-scale-bar{
+  background:linear-gradient(90deg,#2952b7 0%,#2997e0 20%,#31ccb9 36%,#82dc7d 52%,#efe04c 67%,#ffa334 82%,#ee4a34 93%,#9d264e 100%);
+}
+.weather-scale-wind .weather-scale-bar{
+  background:linear-gradient(90deg,#225bab 0%,#2397dc 22%,#33cdd3 43%,#45d787 62%,#d7dc4a 79%,#ffa231 91%,#ee433d 100%);
+}
+.weather-scale-humidity .weather-scale-bar{
+  background:linear-gradient(90deg,#c26537 0%,#cc8940 20%,#a9bc4f 38%,#4abe70 55%,#2cbea0 72%,#3097cf 87%,#2f52a3 100%);
+}
+.weather-scale-cloud .weather-scale-bar{
+  background:linear-gradient(90deg,#111c27 0%,#364c5b 30%,#708792 52%,#becacc 73%,#e5ebea 89%,#fff 100%);
+}
+.weather-scale-visibility .weather-scale-bar{
+  background:linear-gradient(90deg,#b8305b 0%,#e04957 18%,#e78e42 38%,#c1ce5b 56%,#47be70 72%,#37b0cf 87%,#2f5ba0 100%);
+}
+.map-shell:fullscreen .weather-scale,
+.map-shell.map-shell-fullscreen .weather-scale{
+  right:18px;
+  bottom:18px;
+}
+@media(max-width:700px){
+  .weather-scale{
+    left:10px;
+    right:auto;
+    bottom:10px;
+    width:165px;
+  }
+  .map-shell:fullscreen .weather-scale,
+  .map-shell.map-shell-fullscreen .weather-scale{
+    left:10px;
+    right:auto;
+    bottom:10px;
+  }
+}
