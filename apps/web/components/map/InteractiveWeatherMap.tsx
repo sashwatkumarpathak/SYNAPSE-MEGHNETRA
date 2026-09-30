@@ -261,7 +261,6 @@ export function getDynamicLayerDomain(
 
 function interpolateColor(
   value: number,
-  config: (typeof layerConfig)[keyof typeof layerConfig],
   layer: keyof typeof layerConfig,
   domain: WeatherFieldDomain,
 ) {
@@ -338,7 +337,7 @@ function renderWeatherRaster(
 
       const sample = sampleWeather(lng, lat, events);
       const value = sample[config.field as keyof WeatherSample] as number;
-      const [r, g, b, a] = interpolateColor(value, config, layer, domain);
+      const [r, g, b, a] = interpolateColor(value, layer, domain);
 
       data[index] = r;
       data[index + 1] = g;
