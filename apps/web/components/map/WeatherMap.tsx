@@ -10,6 +10,15 @@ import { InteractiveWeatherMap } from './InteractiveWeatherMap';
 function PlusIcon(){return <span className="pm">+</span>}
 function MinusIcon(){return <span className="pm">−</span>}
 
+const layerScale: Record<WeatherLayer, { min: string; mid: string; max: string; unit: string }> = {
+  rainfall: { min: '0', mid: '5', max: '10+', unit: 'mm/h' },
+  temperature: { min: '10°', mid: '28°', max: '45°', unit: '°C' },
+  wind: { min: '0', mid: '20', max: '40+', unit: 'km/h' },
+  humidity: { min: '0', mid: '50', max: '100', unit: '%' },
+  cloud: { min: '0', mid: '50', max: '100', unit: '%' },
+  visibility: { min: '1', mid: '7', max: '12+', unit: 'km' },
+};
+
 export function WeatherMap({selected,setSelected}:{selected:WeatherEvent,setSelected:(e:WeatherEvent)=>void}){
   const [layer,setLayer]=useState<WeatherLayer>('rainfall');
   const [mode,setMode]=useState<'2D'|'3D'>('2D');
@@ -45,6 +54,19 @@ export function WeatherMap({selected,setSelected}:{selected:WeatherEvent,setSele
       <InteractiveWeatherMap events={events} selected={selected} mode={mode} layer={layer} onSelect={setSelected}/>
       <LayerControl value={layer} onChange={setLayer}/>
       <ViewModeToggle mode={mode} onChange={setMode}/>
+
+      <div className={`weather-scale weather-scale-${layer}`} aria-label={`${layer} intensity scale`}>
+        <div className="weather-scale-head">
+          <span>{layer.toUpperCase()} FIELD</span>
+          <b>{layerScale[layer].unit}</b>
+        </div>
+        <div className="weather-scale-bar"/>
+        <div className="weather-scale-values">
+          <span>{layerScale[layer].min}</span>
+          <span>{layerScale[layer].mid}</span>
+          <span>{layerScale[layer].max}</span>
+        </div>
+      </div>
 
       <div className="map-size-controls" aria-label="Map sizing controls">
         <button
