@@ -127,12 +127,12 @@ function sampleWeather(lng: number, lat: number, events: WeatherEvent[]): Weathe
 }
 
 function rasterSize(zoom: number) {
-  // Compact texture: the map stays interactive while the weather field remains
-  // visually continuous at national, regional and street-level zooms.
-  if (zoom < 7) return 192;
-  if (zoom < 11) return 208;
-  if (zoom < 15) return 224;
-  return 240;
+  // Higher-resolution field textures keep subtle gradients visible instead of
+  // collapsing nearby values into coarse color blocks.
+  if (zoom < 7) return 320;
+  if (zoom < 11) return 384;
+  if (zoom < 15) return 448;
+  return 512;
 }
 
 function mercatorY(lat: number) {
@@ -147,43 +147,125 @@ function latitudeFromMercator(y: number) {
 type ColorStop = readonly [number, readonly [number, number, number]];
 
 const FIELD_COLOR_STOPS: Record<keyof typeof layerConfig, readonly ColorStop[]> = {
+  // Dense, continuous ramps inspired by operational weather-map palettes.
+  // More stops = more distinguishable nearby values without visible banding.
   rainfall: [
-    [0.00, [18, 78, 116]], [0.08, [49, 151, 213]], [0.20, [43, 199, 224]],
-    [0.38, [47, 205, 111]], [0.56, [225, 224, 65]], [0.74, [255, 170, 49]],
-    [0.88, [246, 74, 48]], [1.00, [190, 31, 76]],
+    [0.00, [25, 74, 178]], [0.07, [20, 112, 220]], [0.14, [18, 158, 245]],
+    [0.21, [17, 198, 241]], [0.28, [23, 220, 211]], [0.35, [48, 220, 168]],
+    [0.42, [83, 222, 125]], [0.49, [133, 226, 91]], [0.56, [190, 231, 67]],
+    [0.63, [231, 226, 55]], [0.70, [250, 203, 49]], [0.77, [255, 168, 40]],
+    [0.84, [255, 123, 34]], [0.90, [247, 76, 42]], [0.96, [220, 43, 65]],
+    [1.00, [164, 27, 91]],
   ],
   temperature: [
-    [0.00, [41, 82, 183]], [0.18, [41, 151, 224]], [0.36, [49, 204, 197]],
-    [0.52, [130, 220, 125]], [0.66, [239, 224, 76]], [0.80, [255, 163, 52]],
-    [0.92, [238, 74, 52]], [1.00, [157, 38, 78]],
+    [0.00, [24, 65, 173]], [0.07, [21, 108, 218]], [0.14, [18, 155, 244]],
+    [0.21, [16, 195, 244]], [0.28, [19, 220, 216]], [0.35, [42, 222, 171]],
+    [0.42, [76, 224, 127]], [0.49, [126, 228, 93]], [0.56, [183, 232, 69]],
+    [0.63, [228, 227, 57]], [0.70, [250, 205, 49]], [0.77, [255, 169, 40]],
+    [0.84, [255, 125, 34]], [0.90, [247, 78, 40]], [0.96, [218, 43, 61]],
+    [1.00, [164, 27, 86]],
   ],
   wind: [
-    [0.00, [34, 91, 171]], [0.20, [35, 151, 220]], [0.42, [51, 205, 211]],
-    [0.62, [69, 214, 135]], [0.78, [215, 220, 74]], [0.90, [255, 162, 49]],
-    [1.00, [238, 67, 61]],
+    [0.00, [19, 66, 166]], [0.08, [18, 112, 220]], [0.16, [17, 158, 243]],
+    [0.24, [18, 197, 241]], [0.32, [25, 218, 213]], [0.40, [49, 220, 173]],
+    [0.48, [91, 224, 129]], [0.56, [145, 227, 91]], [0.64, [198, 229, 67]],
+    [0.72, [235, 219, 54]], [0.80, [255, 181, 43]], [0.88, [255, 126, 34]],
+    [0.94, [246, 74, 42]], [1.00, [213, 43, 62]],
   ],
   humidity: [
-    [0.00, [194, 101, 55]], [0.18, [204, 137, 63]], [0.38, [169, 188, 79]],
-    [0.55, [74, 190, 112]], [0.72, [44, 190, 181]], [0.86, [48, 151, 207]],
-    [1.00, [47, 82, 163]],
+    [0.00, [174, 78, 45]], [0.08, [197, 96, 48]], [0.16, [213, 119, 53]],
+    [0.24, [215, 146, 57]], [0.32, [200, 172, 63]], [0.40, [168, 197, 71]],
+    [0.48, [125, 211, 83]], [0.56, [77, 211, 105]], [0.64, [44, 207, 133]],
+    [0.72, [34, 200, 165]], [0.80, [39, 188, 194]], [0.88, [46, 161, 211]],
+    [0.94, [45, 125, 197]], [1.00, [38, 83, 164]],
   ],
   cloud: [
-    [0.00, [17, 28, 39]], [0.30, [54, 76, 91]], [0.52, [112, 135, 146]],
-    [0.72, [190, 202, 204]], [0.88, [228, 235, 234]], [1.00, [255, 255, 255]],
+    [0.00, [18, 28, 38]], [0.10, [36, 48, 61]], [0.20, [58, 72, 84]],
+    [0.30, [82, 98, 108]], [0.40, [111, 126, 135]], [0.50, [140, 151, 157]],
+    [0.60, [166, 176, 180]], [0.70, [190, 199, 201]], [0.80, [215, 221, 220]],
+    [0.90, [236, 240, 239]], [1.00, [255, 255, 255]],
   ],
   visibility: [
-    [0.00, [184, 48, 91]], [0.18, [224, 73, 87]], [0.38, [231, 142, 66]],
-    [0.56, [193, 206, 91]], [0.72, [71, 190, 112]], [0.86, [55, 176, 207]],
-    [1.00, [47, 91, 160]],
+    [0.00, [178, 42, 92]], [0.08, [207, 52, 91]], [0.16, [225, 72, 83]],
+    [0.24, [232, 103, 72]], [0.32, [232, 137, 63]], [0.40, [218, 166, 70]],
+    [0.48, [194, 194, 78]], [0.56, [151, 207, 84]], [0.64, [96, 205, 103]],
+    [0.72, [55, 198, 132]], [0.80, [44, 190, 166]], [0.88, [49, 169, 199]],
+    [0.94, [48, 132, 192]], [1.00, [43, 87, 161]],
   ],
 };
+
+export type WeatherFieldDomain = {
+  min: number;
+  max: number;
+};
+
+function fieldValue(sample: WeatherSample, layer: keyof typeof layerConfig) {
+  return sample[layerConfig[layer].field as keyof WeatherSample] as number;
+}
+
+export function getDynamicLayerDomain(
+  layer: keyof typeof layerConfig,
+  events: WeatherEvent[],
+): WeatherFieldDomain {
+  const values: number[] = [];
+  const samplesX = 70;
+  const samplesY = 60;
+
+  // Derive the color domain from the current synthetic India field rather than
+  // using a global 0–45°C (or equivalent) range. In production this same
+  // contract will consume the provider-backed national grid.
+  for (let y = 0; y < samplesY; y += 1) {
+    const lat = 8 + (29 * y) / (samplesY - 1);
+    for (let x = 0; x < samplesX; x += 1) {
+      const lng = 68 + (29 * x) / (samplesX - 1);
+      if (!pointInIndia(lng, lat)) continue;
+      values.push(fieldValue(sampleWeather(lng, lat, events), layer));
+    }
+  }
+
+  values.sort((a, b) => a - b);
+  if (!values.length) {
+    return { min: layerConfig[layer].min, max: layerConfig[layer].max };
+  }
+
+  const quantile = (q: number) => values[Math.min(values.length - 1, Math.floor((values.length - 1) * q))];
+  let min = quantile(0.02);
+  let max = quantile(0.98);
+
+  const minimumSpan: Record<keyof typeof layerConfig, number> = {
+    rainfall: 1.5,
+    temperature: 7,
+    wind: 10,
+    humidity: 22,
+    cloud: 22,
+    visibility: 4,
+  };
+
+  const floor = minimumSpan[layer];
+  if (max - min < floor) {
+    const center = (min + max) / 2;
+    min = center - floor / 2;
+    max = center + floor / 2;
+  }
+
+  const padding = (max - min) * 0.04;
+  min = Math.max(layerConfig[layer].min, min - padding);
+  max = Math.min(layerConfig[layer].max, max + padding);
+
+  if (max <= min) {
+    return { min: layerConfig[layer].min, max: layerConfig[layer].max };
+  }
+
+  return { min, max };
+}
 
 function interpolateColor(
   value: number,
   config: (typeof layerConfig)[keyof typeof layerConfig],
   layer: keyof typeof layerConfig,
+  domain: WeatherFieldDomain,
 ) {
-  const normalized = Math.max(0, Math.min(1, (value - config.min) / (config.max - config.min)));
+  const normalized = Math.max(0, Math.min(1, (value - domain.min) / Math.max(0.0001, domain.max - domain.min)));
   const stops = FIELD_COLOR_STOPS[layer];
 
   let left = stops[0];
@@ -203,30 +285,17 @@ function interpolateColor(
     Math.round(channel + (right[1][index] - channel) * eased),
   );
 
-  // Weather layers should read as transparent atmospheric fields, not solid paint.
-  // Precipitation is intentionally sparse; temperature/humidity can carry more base field.
-  // The field must read clearly against the dark basemap. Keep the low end
-  // visible and reserve the brightest opacity for genuine high-intensity areas.
+  // Keep the field visibly saturated against the dark basemap. The basemap
+  // remains readable underneath, but the weather data is no longer washed out.
   const opacityBase =
-    layer === 'rainfall' ? 0.16 :
-    layer === 'temperature' ? 0.30 :
-    layer === 'wind' ? 0.28 :
-    layer === 'humidity' ? 0.27 :
-    layer === 'cloud' ? 0.24 : 0.27;
+    layer === 'temperature' ? 0.76 :
+    layer === 'wind' ? 0.72 :
+    layer === 'humidity' ? 0.70 :
+    layer === 'cloud' ? 0.62 :
+    layer === 'visibility' ? 0.70 : 0.68;
   const opacityGain =
-    layer === 'rainfall' ? 0.70 :
-    layer === 'temperature' ? 0.60 :
-    layer === 'wind' ? 0.62 :
-    layer === 'humidity' ? 0.62 :
-    layer === 'cloud' ? 0.68 : 0.64;
-
-  const threshold =
-    layer === 'rainfall' ? 0.025 :
-    layer === 'temperature' ? 0.00 : 0.01;
-
-  const alpha = normalized < threshold
-    ? 0
-    : Math.min(0.92, opacityBase + Math.pow((normalized - threshold) / Math.max(0.001, 1 - threshold), 1.12) * opacityGain);
+    layer === 'cloud' ? 0.26 : 0.24;
+  const alpha = Math.min(0.98, opacityBase + Math.pow(normalized, 0.9) * opacityGain);
 
   return [rgb[0], rgb[1], rgb[2], Math.round(alpha * 255)] as const;
 }
@@ -248,6 +317,7 @@ function renderWeatherRaster(
   const image = ctx.createImageData(size, size);
   const data = image.data;
   const config = layerConfig[layer];
+  const domain = getDynamicLayerDomain(layer, events);
   const northY = mercatorY(bounds.north);
   const southY = mercatorY(bounds.south);
 
@@ -268,7 +338,7 @@ function renderWeatherRaster(
 
       const sample = sampleWeather(lng, lat, events);
       const value = sample[config.field as keyof WeatherSample] as number;
-      const [r, g, b, a] = interpolateColor(value, config, layer);
+      const [r, g, b, a] = interpolateColor(value, config, layer, domain);
 
       data[index] = r;
       data[index + 1] = g;
