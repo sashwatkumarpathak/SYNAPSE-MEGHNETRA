@@ -211,9 +211,8 @@ export type WeatherFieldDomain = {
 };
 
 // Temperature colours are normalized in Fahrenheit, while all product-facing
-// temperature values remain Celsius. This keeps the visual mapping on a fixed
-// -4°F..104°F scale, exactly equivalent to -20°C..40°C.
-const STATIC_TEMPERATURE_DOMAIN_F: WeatherFieldDomain = { min: -4, max: 104 };
+// temperature values remain Celsius. The domain is derived dynamically from
+// the current day's India-wide low/high temperature field.
 
 function fieldValue(sample: WeatherSample, layer: keyof typeof layerConfig) {
   const value = sample[layerConfig[layer].field as keyof WeatherSample] as number;
@@ -226,8 +225,6 @@ export function getDynamicLayerDomain(
   layer: keyof typeof layerConfig,
   events: WeatherEvent[],
 ): WeatherFieldDomain {
-  if (layer === 'temperature') return STATIC_TEMPERATURE_DOMAIN_F;
-
   const values: number[] = [];
   const samplesX = 70;
   const samplesY = 60;
@@ -246,16 +243,18 @@ export function getDynamicLayerDomain(
 
   values.sort((a, b) => a - b);
   if (!values.length) {
-    return { min: layerConfig[layer].min, max: layerConfig[layer].max };
+    return layer === 'temperature'
+      ? { min: -4, max: 104 }
+      : { min: layerConfig[layer].min, max: layerConfig[layer].max };
   }
 
   const quantile = (q: number) => values[Math.min(values.length - 1, Math.floor((values.length - 1) * q))];
-  let min = quantile(0.02);
-  let max = quantile(0.98);
+  let min = layer === 'temperature' ? values[0] : quantile(0.02);
+  let max = layer === 'temperature' ? values[values.length - 1] : quantile(0.98);
 
   const minimumSpan: Record<keyof typeof layerConfig, number> = {
     rainfall: 1.5,
-    temperature: 7,
+    temperature: 1,
     wind: 10,
     humidity: 22,
     cloud: 22,
@@ -269,12 +268,18 @@ export function getDynamicLayerDomain(
     max = center + floor / 2;
   }
 
-  const padding = (max - min) * 0.04;
-  min = Math.max(layerConfig[layer].min, min - padding);
-  max = Math.min(layerConfig[layer].max, max + padding);
+  if (layer !== 'temperature') {
+    const padding = (max - min) * 0.04;
+    min = Math.max(layerConfig[layer].min, min - padding);
+    max = Math.min(layerConfig[layer].max, max + padding);
+  }
 
   if (max <= min) {
     return { min: layerConfig[layer].min, max: layerConfig[layer].max };
+  }
+
+  if (layer === 'temperature') {
+    return { min: (min * 9) / 5 + 32, max: (max * 9) / 5 + 32 };
   }
 
   return { min, max };
