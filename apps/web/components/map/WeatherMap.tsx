@@ -40,13 +40,7 @@ export function WeatherMap({selected,setSelected}:{selected:WeatherEvent,setSele
 
   const shellClass = `map-shell${expanded ? ' map-shell-expanded' : ''}${fullscreen ? ' map-shell-fullscreen' : ''}`;
   const dynamicDomain = getDynamicLayerDomain(layer, events);
-  const displayDomain = layer === 'temperature'
-    ? {
-        min: (dynamicDomain.min - 32) * 5 / 9,
-        max: (dynamicDomain.max - 32) * 5 / 9,
-      }
-    : dynamicDomain;
-  const dynamicMid = (displayDomain.min + displayDomain.max) / 2;
+  const dynamicMid = (dynamicDomain.min + dynamicDomain.max) / 2;
 
   const toggleFullscreen = async () => {
     const shell = shellRef.current;
@@ -71,26 +65,26 @@ export function WeatherMap({selected,setSelected}:{selected:WeatherEvent,setSele
 
       <div className={`weather-scale weather-scale-${layer}`} aria-label={`${layer} intensity scale`}>
         <div className="weather-scale-head">
-          <span>{layer === 'temperature' ? 'TEMPERATURE · INDIA TODAY' : `${layer.toUpperCase()} · INDIA RANGE`}</span>
+          <span>{layer === 'temperature' ? 'TEMPERATURE · FIXED RANGE' : `${layer.toUpperCase()} · INDIA RANGE`}</span>
           <b>{layerUnits[layer]}</b>
         </div>
         <div className="weather-scale-bar"/>
         <div className="weather-scale-values">
           {layer === 'temperature' ? (
             <>
-              <span>{formatScaleValue(displayDomain.min, layer)}</span>
-              <span>{formatScaleValue(displayDomain.min + (displayDomain.max - displayDomain.min) * 0.167, layer)}</span>
-              <span>{formatScaleValue(displayDomain.min + (displayDomain.max - displayDomain.min) * 0.333, layer)}</span>
-              <span>{formatScaleValue(displayDomain.min + (displayDomain.max - displayDomain.min) * 0.5, layer)}</span>
-              <span>{formatScaleValue(displayDomain.min + (displayDomain.max - displayDomain.min) * 0.667, layer)}</span>
-              <span>{formatScaleValue(displayDomain.min + (displayDomain.max - displayDomain.min) * 0.833, layer)}</span>
-              <span>{formatScaleValue(displayDomain.max, layer)}</span>
+              <span>-20°</span>
+              <span>-10°</span>
+              <span>0°</span>
+              <span>10°</span>
+              <span>20°</span>
+              <span>30°</span>
+              <span>40°</span>
             </>
           ) : (
             <>
-              <span>{formatScaleValue(displayDomain.min, layer)}</span>
+              <span>{formatScaleValue(dynamicDomain.min, layer)}</span>
               <span>{formatScaleValue(dynamicMid, layer)}</span>
-              <span>{formatScaleValue(displayDomain.max, layer)}</span>
+              <span>{formatScaleValue(dynamicDomain.max, layer)}</span>
             </>
           )}
         </div>
